@@ -201,7 +201,11 @@ class FcpeTracker(Tracker):
         from torchfcpe import spawn_bundled_infer_model
 
         if FcpeTracker._model is None:
-            FcpeTracker._model = spawn_bundled_infer_model(device="cpu")
+            import contextlib
+            import sys
+
+            with contextlib.redirect_stdout(sys.stderr):  # torchfcpe prints INFO lines to stdout
+                FcpeTracker._model = spawn_bundled_infer_model(device="cpu")
         n = int(np.ceil(len(y) / sr / hop_s))
         x = torch.tensor(y, dtype=torch.float32)[None, :, None]
         with torch.no_grad():
