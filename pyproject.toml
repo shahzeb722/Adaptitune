@@ -24,6 +24,8 @@ dependencies = [
   "mir_eval>=0.7",
   "pandas>=2.0",
   "matplotlib>=3.8",
+  "tabulate>=0.9",  # pandas to_markdown for result tables
+  "pyyaml>=6",  # MedleyDB metadata
   "setuptools<81",  # pyworld still imports pkg_resources
 ]
 
