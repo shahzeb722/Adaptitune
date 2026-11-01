@@ -9,8 +9,10 @@ peak resident memory is measured per tracker and one crash cannot sink the whole
 from __future__ import annotations
 
 import json
-import multiprocessing as mp
 import resource
+import subprocess
+import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -23,6 +25,7 @@ from .. import metrics as M
 def _items(dataset: str, root: str | None, limit: int | None, seed: int = 0):
     from ..data import datasets as D
 
+    root = root or None
     if dataset == "mir1k":
         it = D.mir1k(root)
     elif dataset == "mdb":
@@ -41,14 +44,22 @@ def _synthetic_items(n: int, seed: int):
     from ..data.datasets import Item
     from ..data.detune import make_singers, synth_clean_take
 
+    from ..audio import Audio
+
     rng = np.random.default_rng(seed)
     singers = make_singers(max(4, n // 4), seed + 1)
     for i in range(n):
         a, tr, _ = synth_clean_take(singers[i % len(singers)], rng, 16_000)
-        yield Item(f"synth/{i}", singers[i % len(singers)].name, a, tr.times, tr.f0)
+        # background noise at 0-20 dB SNR (pink-ish), otherwise every tracker scores ~100 %
+        snr = float(rng.uniform(0, 20))
+        noise = np.cumsum(rng.standard_normal(len(a.samples))) * 0.02 + rng.standard_normal(len(a.samples))
+        noise -= np.convolve(noise, np.ones(400) / 400, mode="same")
+        sig_p = np.mean(a.samples[tr.f0.repeat(int(tr.hop_s * a.sr))[: len(a.samples)] > 0] ** 2) if (tr.f0 > 0).any() else np.mean(a.samples**2)
+        noise *= np.sqrt(sig_p / (np.mean(noise**2) * 10 ** (snr / 10)))
+        yield Item(f"synth/{i}", singers[i % len(singers)].name, Audio(a.samples + noise, a.sr), tr.times, tr.f0, meta={"snr_db": snr})
 
 
-def _worker(name: str, dataset: str, root: str | None, limit: int | None, q):
+def _worker(name: str, dataset: str, root: str | None, limit: int | None, out_path: str):
     import warnings
 
     warnings.filterwarnings("ignore")
@@ -74,9 +85,25 @@ def _worker(name: str, dataset: str, root: str | None, limit: int | None, q):
             acc = M.raw_pitch_accuracy(item.ref_times, item.ref_f0, tr.times, tr.f0)
             rows.append(dict(tracker=name, item=item.id, duration=item.audio.duration, seconds=el, **acc))
         peak_mb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
-        q.put(dict(ok=True, rows=rows, peak_mb=peak_mb))
+        res = dict(ok=True, rows=rows, peak_mb=peak_mb)
     except Exception as e:  # pragma: no cover
-        q.put(dict(ok=False, error=f"{type(e).__name__}: {e}", rows=rows))
+        res = dict(ok=False, error=f"{type(e).__name__}: {e}", rows=rows)
+    with open(out_path, "w") as f:
+        json.dump(res, f)
+
+
+def _run_isolated(name, dataset, root, limit) -> dict:
+    """Fresh interpreter per tracker, so peak RSS is that tracker's alone."""
+    with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as tf:
+        out = tf.name
+    code = "import sys; from adaptitune.bench.trackers import _worker; _worker(*sys.argv[1:4], None if sys.argv[4]=='None' else int(sys.argv[4]), sys.argv[5])"
+    root_arg = root if root else ""
+    proc = subprocess.run([sys.executable, "-c", code, name, dataset, root_arg, str(limit), out], capture_output=True, text=True)
+    try:
+        with open(out) as f:
+            return json.load(f)
+    except Exception:
+        return dict(ok=False, error=f"worker exited {proc.returncode}: {proc.stderr[-500:]}", rows=[])
 
 
 def run(
@@ -91,14 +118,9 @@ def run(
     trackers = trackers or available_trackers()
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
-    ctx = mp.get_context("spawn")
     per_item, summary = [], []
     for name in trackers:
-        q = ctx.Queue()
-        p = ctx.Process(target=_worker, args=(name, dataset, root, limit, q))
-        p.start()
-        res = q.get()
-        p.join()
+        res = _run_isolated(name, dataset, root or None, limit)
         if not res["ok"]:
             print(f"[{name}] failed: {res['error']}")
             continue

@@ -48,3 +48,6 @@ filterwarnings = ["ignore::UserWarning:pyworld", "ignore::DeprecationWarning"]
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+
+[tool.setuptools.package-data]
+adaptitune = ["agent/population_model.json"]

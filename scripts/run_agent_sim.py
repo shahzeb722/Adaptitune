@@ -1,0 +1,33 @@
+"""O4: train the population model and run the agent simulation.
+
+    python scripts/run_agent_sim.py --singers 100 --horizon 20 --out results/agent
+"""
+
+import argparse
+import warnings
+from pathlib import Path
+
+warnings.filterwarnings("ignore")
+
+from adaptitune.agent.experiment import run, train_population  # noqa: E402
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--singers", type=int, default=100, help="per preference model")
+    ap.add_argument("--horizon", type=int, default=20)
+    ap.add_argument("--session-len", type=int, default=4)
+    ap.add_argument("--pop-singers", type=int, default=3000)
+    ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--out", default="results/agent")
+    a = ap.parse_args()
+    pop = train_population(a.pop_singers)
+    out = Path(a.out)
+    out.mkdir(parents=True, exist_ok=True)
+    (out / "population_model.json").write_text(pop.to_json())
+    _, s = run(singers_per_model=a.singers, horizon=a.horizon, session_len=a.session_len, seed=a.seed, population=pop, out_dir=out)
+    print((out / "summary.md").read_text())
+
+
+if __name__ == "__main__":
+    main()

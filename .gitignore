@@ -12,3 +12,6 @@ results/
 !tests/fixtures/*.wav
 *.onnx
 *.sqlite
+graphify-out/cache/
+graphify-out/.graphify_*
+src/graphify-out/

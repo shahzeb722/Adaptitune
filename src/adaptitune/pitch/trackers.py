@@ -283,9 +283,34 @@ REGISTRY: dict[str, type[Tracker]] = {
 }
 
 
+def find_onnx_model() -> str | None:
+    """An exported tracker, from $ADAPTITUNE_ONNX, ~/.adaptitune/pesto.onnx, ./models/pesto.onnx
+    or next to a frozen (PyInstaller) executable."""
+    import os
+    import sys
+    from pathlib import Path
+
+    cands = [os.environ.get("ADAPTITUNE_ONNX")]
+    home = Path(os.environ.get("ADAPTITUNE_HOME", Path.home() / ".adaptitune"))
+    cands += [str(home / "pesto.onnx"), "models/pesto.onnx"]
+    if getattr(sys, "frozen", False):
+        cands.append(str(Path(sys.executable).parent / "models" / "pesto.onnx"))
+    for c in cands:
+        if c and Path(c).is_file():
+            return c
+    return None
+
+
 def get_tracker(name: str = "auto", **kw) -> Tracker:
-    """'auto' picks the benchmark winner if installed (PESTO, then FCPE) else pYIN."""
+    """'auto' prefers an exported ONNX tracker (the deployment path), then PESTO or FCPE if
+    PyTorch is installed, then pYIN."""
     if name == "auto":
+        onnx = find_onnx_model()
+        if onnx:
+            try:
+                return OnnxTracker(onnx, **kw)
+            except Exception:
+                pass
         for cand in ("pesto", "fcpe"):
             if REGISTRY[cand].available():
                 return REGISTRY[cand](**kw)
