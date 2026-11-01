@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+build/
+dist/
+data/raw/
+data/corpus/
+results/
+*.wav
+!tests/fixtures/*.wav
+*.onnx
+*.sqlite
