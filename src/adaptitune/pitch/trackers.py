@@ -21,6 +21,13 @@ FMIN, FMAX = 65.0, 1100.0  # C2 .. C#6, covers bass to soprano (the app's search
 # The O2 benchmark searches C1 .. B6 for every tracker that takes a range: the native range
 # of CREPE and FCPE, and wide enough for the bass and flute stems in MDB-stem-synth.
 BENCH_FMIN, BENCH_FMAX = 32.70, 1975.5
+# Long inputs are tracked in segments of SEGMENT_S seconds, each with SEGMENT_CONTEXT_S of
+# extra audio on both sides that is tracked and then dropped. This bounds memory: PESTO needs
+# about 34 MB per second of audio in one piece (5.8 GB for a 3-minute MDB stem), and several
+# trackers grow similarly. The context is longer than PESTO's longest CQT kernel (about
+# +-1.02 s at 16 kHz) and pYIN/CREPE's frames, so the kept frames see the same audio as an
+# unsegmented run would.
+SEGMENT_S, SEGMENT_CONTEXT_S = 30.0, 1.5
 
 
 def default_threads() -> int:
@@ -88,11 +95,33 @@ class Tracker(ABC):
     def track(self, x: np.ndarray, sr: int, hop_s: float = DEFAULT_HOP_S) -> PitchTrack:
         y = resample(x, sr, self.analysis_sr)
         t0 = time.perf_counter()
-        pt = self._track(y, self.analysis_sr, hop_s)
+        pt = self._track_segmented(y, self.analysis_sr, hop_s)
         pt.seconds = time.perf_counter() - t0
         pt.tracker = self.name
         n = int(np.ceil(len(x) / sr / hop_s))
         return pt.resampled(hop_s, n)
+
+    def _track_segmented(self, y: np.ndarray, sr: int, hop_s: float) -> PitchTrack:
+        """``_track`` on SEGMENT_S pieces with SEGMENT_CONTEXT_S of context, joined again."""
+        seg, ctx = int(round(SEGMENT_S * sr)), int(round(SEGMENT_CONTEXT_S * sr))
+        if len(y) <= seg + 2 * ctx:
+            return self._track(y, sr, hop_s)
+        times, f0, voicing, raw, hops = [], [], [], [], []
+        for s0 in range(0, len(y), seg):
+            a, b = max(0, s0 - ctx), min(len(y), s0 + seg + ctx)
+            p = self._track(y[a:b], sr, hop_s)
+            t = p.times + a / sr
+            # keep the frames that belong to [s0, s0 + seg); the quarter-hop margin keeps a frame
+            # that sits exactly on a boundary in exactly one segment despite rounding
+            m = 0.25 * p.hop_s
+            keep = (t >= s0 / sr - m) & (t < (s0 + seg) / sr - m)
+            times.append(t[keep])
+            f0.append(p.f0[keep])
+            voicing.append(p.voicing[keep])
+            raw.append(None if p.raw_f0 is None else p.raw_f0[keep])
+            hops.append(p.hop_s)
+        raw_f0 = None if any(r is None for r in raw) else np.concatenate(raw)
+        return PitchTrack(np.concatenate(times), np.concatenate(f0), np.concatenate(voicing), hops[0], raw_f0=raw_f0)
 
     @abstractmethod
     def _track(self, y: np.ndarray, sr: int, hop_s: float) -> PitchTrack: ...
@@ -290,12 +319,31 @@ class CrepeTracker(Tracker):
         hop = int(round(hop_s * sr))
         x = torch.tensor(y, dtype=torch.float32)[None]
         f0, per = torchcrepe.predict(
-            x, sr, hop, self.fmin, self.fmax, self.model, return_periodicity=True, batch_size=512, device="cpu"
+            x, sr, hop, self.fmin, self.fmax, self.model, decoder=_crepe_viterbi_local_average,
+            return_periodicity=True, batch_size=512, device="cpu",
         )
         raw = f0.squeeze().numpy().astype(np.float64)
         per = per.squeeze().numpy().astype(np.float64)
         f0 = np.where(per > self.threshold, raw, 0.0)
         return PitchTrack(np.arange(len(f0)) * hop / sr, f0, per, hop / sr, raw_f0=raw)
+
+
+def _crepe_viterbi_local_average(salience):
+    """CREPE's own decoding with Viterbi smoothing (Kim et al. 2018, ``crepe --viterbi``): the
+    Viterbi path picks a bin per frame, then the pitch is the salience-weighted mean of the
+    path bin and its four neighbours on each side. torchcrepe's default decoder returns the
+    bin centre plus random triangular dither of up to +-20 cents instead, which made two runs
+    on the same audio differ by up to 37 cents and is not what the paper evaluates."""
+    import torch
+    import torchcrepe
+
+    bins, _ = torchcrepe.decode.viterbi(salience)  # its frequencies carry the dither; only the path is used
+    sal = torch.where(torch.isfinite(salience), salience, torch.zeros_like(salience))
+    idx = torch.arange(sal.shape[1], device=sal.device)[None, :, None]
+    w = sal * ((idx >= bins[:, None, :] - 4) & (idx <= bins[:, None, :] + 4))
+    cents = torchcrepe.CENTS_PER_BIN * idx.to(sal.dtype) + 1997.3794084376191
+    cents = (w * cents).sum(1) / w.sum(1).clamp_min(1e-12)
+    return bins, torchcrepe.convert.cents_to_frequency(cents)
 
 
 class OnnxTracker(Tracker):

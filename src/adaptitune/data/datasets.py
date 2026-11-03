@@ -12,7 +12,8 @@ at the extracted folders:
   ``PitchLabel/*.pv`` (one semitone value per 20 ms frame, first frame centred at 20 ms,
   0 = unvoiced). Used for the tracker benchmark.
 * MDB-stem-synth (Salamon et al. 2017), https://zenodo.org/records/1481172
-  Layout: ``audio_stem/*.RESYN.wav`` and ``annotation_stem/*.RESYN.csv`` (time, f0).
+  Layout: ``audio_stems/*.RESYN.wav`` and ``annotation_stems/*.RESYN.csv`` (time, f0). The
+  singular folder names of some copies are accepted too.
   Exact labels, the fairest tracker benchmark.
 * MedleyDB vocal stems (Bittner et al. 2014), access on request, non-commercial.
   Layout: ``<Track>/<Track>_STEMS/*.wav`` plus the track's ``_METADATA.yaml``.
@@ -52,6 +53,25 @@ def _read(path: Path, sr: int | None, channel: int | None = None) -> Audio:
     return Audio(np.asarray(x, np.float64), file_sr)
 
 
+def _junk(path: Path) -> bool:
+    """macOS metadata that zips made on a Mac carry along: ``__MACOSX/`` and ``._name`` files.
+    They have audio-like names but are not audio."""
+    return path.name.startswith("._") or "__MACOSX" in path.parts
+
+
+def _find_dir(root: str | Path, names: tuple[str, ...], max_depth: int = 3) -> Path | None:
+    """The first folder named one of ``names`` at ``root`` or up to ``max_depth`` levels below
+    it, searched breadth first in sorted order, so the dataset can be extracted anywhere."""
+    level = [Path(root)]
+    for _ in range(max_depth + 1):
+        for d in level:
+            for n in names:
+                if (d / n).is_dir():
+                    return d / n
+        level = [c for d in level for c in sorted(d.iterdir()) if c.is_dir() and not _junk(c) and not c.name.startswith(".")]
+    return None
+
+
 # ------------------------------------------------------------------------------ VocalSet
 
 VOCALSET_TECHNIQUES = ("straight", "vibrato", "belt", "breathy", "vocal_fry", "spoken", "lip_trill", "trill", "trillo", "inhaled", "messa", "pp", "forte", "fast_forte", "fast_piano", "slow_forte", "slow_piano")
@@ -61,31 +81,50 @@ VOCALSET_TECHNIQUES = ("straight", "vibrato", "belt", "breathy", "vocal_fry", "s
 VOCALSET_CLEAN_TECHNIQUES = ("straight", "vibrato", "slow_forte", "slow_piano", "messa", "forte", "pp", "belt", "fast_forte", "fast_piano")
 VOCALSET_DEFAULT_TECHNIQUES = ("straight", "vibrato", "slow_forte", "slow_piano", "messa")
 _SINGER_DIR = re.compile(r"^(female|male)(\d+)$")
+_NAME_SINGER = re.compile(r"^\s*([fm])(\d+)_")  # f3_..., m9_...: the singer a file name claims
+# Folder-name slips in the released zips: six vibrato takes sit in a folder called "vibrado".
+VOCALSET_TECHNIQUE_ALIASES = {"vibrado": "vibrato"}
 
 
-def vocalset_files(root: str | Path, techniques: tuple[str, ...] | None = VOCALSET_DEFAULT_TECHNIQUES) -> list[dict]:
+def vocalset_files(root: str | Path, techniques: tuple[str, ...] | None = VOCALSET_DEFAULT_TECHNIQUES,
+                   skipped: list | None = None) -> list[dict]:
     """Every VocalSet recording under ``root`` with its singer, gender, context (arpeggios,
     scales, long_tones, excerpts) and technique, read from the folder names.
 
     Works whichever folder the zip was extracted to (``FULL/``, ``data_by_singer/`` or one
-    level above), and lists each recording once even if the same file appears in several
-    of VocalSet's alternative layouts.
+    level above), and lists each recording once even if it appears in several of VocalSet's
+    alternative layouts (the same path below the singer folder). macOS ``._`` files are
+    ignored. A file whose name names a different singer than its folder (VocalSet 1.1 and 1.2
+    both have ``male8/excerpts/vibrato/m9_caro_vibrato.wav``) is left out, because who sang
+    it is uncertain and a wrong singer would leak a voice across the split; such files are
+    appended to ``skipped`` with the reason. Files with no singer prefix (33 in VocalSet 1.1,
+    e.g. ``female4/scales/straight/scales_straight_a.wav``) keep their folder's singer.
     """
     out, seen = [], set()
     for wav in sorted(Path(root).rglob("*.wav")):
+        if _junk(wav):
+            continue
         parts = wav.parts
         idx = next((i for i, p in enumerate(parts) if _SINGER_DIR.match(p)), None)
-        if idx is None or wav.name in seen:
+        if idx is None:
+            continue
+        key = "/".join(parts[idx:])
+        if key in seen:
             continue
         rest = parts[idx + 1 : -1]
         context = rest[0] if len(rest) >= 1 else ""
-        technique = rest[1] if len(rest) >= 2 else ""
+        technique = VOCALSET_TECHNIQUE_ALIASES.get(rest[1], rest[1]) if len(rest) >= 2 else ""
         if not technique:  # fall back to the file name, e.g. f1_scales_straight_a.wav
             technique = next((t for t in sorted(VOCALSET_TECHNIQUES, key=len, reverse=True) if f"_{t}" in wav.stem), "")
         if techniques and technique not in techniques:
             continue
-        seen.add(wav.name)
+        seen.add(key)
         singer = parts[idx]
+        m = _NAME_SINGER.match(wav.name)
+        if m and f"{'female' if m.group(1) == 'f' else 'male'}{int(m.group(2))}" != singer:
+            if skipped is not None:
+                skipped.append(dict(path=str(wav), reason=f"file name says {m.group(1)}{m.group(2)}, folder says {singer}"))
+            continue
         out.append(dict(path=str(wav), singer=singer, gender="F" if singer.startswith("female") else "M", context=context, technique=technique))
     return out
 
@@ -101,16 +140,17 @@ def vocalset(root: str | Path, sr: int = 24_000, techniques: tuple[str, ...] | N
 # ------------------------------------------------------------------------------ MIR-1K
 
 
-def mir1k(root: str | Path, sr: int = 16_000, mix_snr: float | None = None) -> Iterator[Item]:
+def mir1k(root: str | Path, sr: int = 16_000, mix_snr: float | None = None, shard: tuple[int, int] | None = None) -> Iterator[Item]:
     """MIR-1K clips with their reference pitch. By default only the right (vocal) channel is
     used. With ``mix_snr`` the left (accompaniment) channel is mixed back in at that
     vocal-to-accompaniment ratio in dB, the usual way to test robustness on MIR-1K."""
-    root = Path(root)
-    wav_dir = root / "Wavfile"
-    pv_dir = root / "PitchLabel"
-    for wav in sorted(wav_dir.glob("*.wav")):
-        pv = pv_dir / (wav.stem + ".pv")
-        if not pv.exists():
+    wav_dir = _find_dir(root, ("Wavfile",))
+    if wav_dir is None:
+        raise FileNotFoundError(f"no MIR-1K Wavfile/ folder under {root}")
+    pv_dir = wav_dir.parent / "PitchLabel"
+    pairs = [(w, pv_dir / (w.stem + ".pv")) for w in sorted(wav_dir.glob("*.wav")) if not _junk(w)]
+    for i, (wav, pv) in enumerate(p for p in pairs if p[1].exists()):
+        if shard and i % shard[1] != shard[0]:
             continue
         semis = np.atleast_1d(np.loadtxt(pv))
         # 40 ms frames with a 20 ms hop: frame i covers [20i, 20i + 40) ms, centre 20 + 20i ms
@@ -135,11 +175,16 @@ def mir1k(root: str | Path, sr: int = 16_000, mix_snr: float | None = None) -> I
 # ------------------------------------------------------------------------------ MDB-stem-synth
 
 
-def mdb_stem_synth(root: str | Path, sr: int = 16_000) -> Iterator[Item]:
-    root = Path(root)
-    for wav in sorted((root / "audio_stem").glob("*.wav")):
-        ann = root / "annotation_stem" / (wav.stem + ".csv")
-        if not ann.exists():
+def mdb_stem_synth(root: str | Path, sr: int = 16_000, shard: tuple[int, int] | None = None) -> Iterator[Item]:
+    """MDB-stem-synth stems with their exact reference pitch. ``shard=(k, n)`` keeps every
+    n-th stem starting at k (before any audio is read), to split a run across processes."""
+    audio_dir = _find_dir(root, ("audio_stems", "audio_stem"))
+    if audio_dir is None:
+        raise FileNotFoundError(f"no MDB-stem-synth audio_stems/ folder under {root}")
+    ann_dir = next((audio_dir.parent / n for n in ("annotation_stems", "annotation_stem") if (audio_dir.parent / n).is_dir()), audio_dir)
+    pairs = [(w, ann_dir / (w.stem + ".csv")) for w in sorted(audio_dir.glob("*.wav")) if not _junk(w)]
+    for i, (wav, ann) in enumerate(p for p in pairs if p[1].exists()):
+        if shard and i % shard[1] != shard[0]:
             continue
         try:
             arr = np.loadtxt(ann, delimiter=",", ndmin=2)

@@ -86,6 +86,11 @@ def main(argv=None):
     t.add_argument("--mix-snr", type=float, help="MIR-1K: mix the accompaniment back in at this SNR in dB")
     t.add_argument("--audit", action="store_true", help="also test label time alignment (shifts of -30..30 ms)")
     t.add_argument("--out", default="results/trackers")
+    t.add_argument("--shard", help="k/n: run only the k-th of n interleaved parts (merge them with bench-merge)")
+    bm = sub.add_parser("bench-merge", help="O2: join bench-trackers --shard runs into one result")
+    bm.add_argument("dirs", nargs="+")
+    bm.add_argument("--label", required=True, help="e.g. mdb or mir1k")
+    bm.add_argument("--out", default="results/trackers")
 
     ct = sub.add_parser("choose-tracker", help="O2: apply the pre-registered selection rule to saved results")
     ct.add_argument("--results", default="results/trackers")
@@ -179,12 +184,18 @@ def main(argv=None):
     elif a.cmd == "bench-trackers":
         from .bench.trackers import OFFICIAL_DATASETS, choose_tracker, dataset_label, run, save_choice
 
-        s_ = run(a.dataset, a.root, a.trackers, a.limit, a.out, threads=a.threads, noise_snr=a.noise_snr, mix_snr=a.mix_snr, audit=a.audit)
+        s_ = run(a.dataset, a.root, a.trackers, a.limit, a.out, threads=a.threads, noise_snr=a.noise_snr, mix_snr=a.mix_snr, audit=a.audit,
+                 shard=a.shard)
         print((Path(a.out) / f"{dataset_label(a.dataset, a.noise_snr, a.mix_snr)}_summary.md").read_text())
-        if all((Path(a.out) / f"{d}_summary.csv").exists() for d in OFFICIAL_DATASETS):
+        if not a.shard and all((Path(a.out) / f"{d}_summary.csv").exists() for d in OFFICIAL_DATASETS):
             choice = choose_tracker(a.out)
             save_choice(choice, Path(a.out) / "chosen_tracker.json")
             print("chosen (pre-registered rule):", choice["tracker"], " O2 tracker criterion met:", choice["O2_tracker_pass"])
+    elif a.cmd == "bench-merge":
+        from .bench.trackers import merge_shards
+
+        merge_shards(a.dirs, a.out, a.label)
+        print((Path(a.out) / f"{a.label}_summary.md").read_text())
     elif a.cmd == "choose-tracker":
         from .bench.trackers import choose_tracker, json_safe, save_choice
 

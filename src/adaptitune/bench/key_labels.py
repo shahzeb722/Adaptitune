@@ -132,7 +132,9 @@ def select_mir1k_excerpts(root: str | Path, out_dir: str | Path, n: int = 100, m
     from ..audio import Audio, save
 
     root, out = Path(root), Path(out_dir)
-    wav_dir = root / "Wavfile" if (root / "Wavfile").is_dir() else root
+    from ..data.datasets import _find_dir
+
+    wav_dir = _find_dir(root, ("Wavfile",)) or root
     groups: dict[tuple[str, int], list[tuple[int, Path]]] = {}
     for p in sorted(wav_dir.rglob("*.wav")):
         m = _MIR1K_NAME.match(p.stem)

@@ -1,5 +1,7 @@
 """Dataset loaders against small fake copies of the real folder layouts, and the O1 split planner."""
 
+from pathlib import Path
+
 import numpy as np
 import pytest
 import soundfile as sf
@@ -67,6 +69,54 @@ def test_vocalset_layout_any_root_and_deduplicated(tmp_path):
     assert by["male2"]["context"] == "excerpts" and by["male2"]["technique"] == "vibrato"
     items = list(D.vocalset(tmp_path, sr=24_000))
     assert len(items) == 2 and items[0].audio.sr == 24_000
+
+
+def test_mdb_real_layout_plural_nested_and_macos_junk(tmp_path):
+    base = tmp_path / "MDB-stem-synth"
+    (base / "audio_stems").mkdir(parents=True)
+    (base / "annotation_stems").mkdir()
+    stem = "Artist_Track_STEM_01.RESYN"
+    sf.write(base / "audio_stems" / f"{stem}.wav", _tone(330.0, sr=44_100), 44_100)
+    t = np.arange(100) * 128 / 44_100
+    (base / "annotation_stems" / f"{stem}.csv").write_text("\n".join(f"{a},330.0" for a in t) + "\n")
+    # AppleDouble files that zips made on a Mac carry: audio-like names, not audio
+    (base / "audio_stems" / f"._{stem}.wav").write_bytes(b"\x00\x05\x16\x07" + bytes(222))
+    (base / "annotation_stems" / f"._{stem}.csv").write_bytes(b"\x00\x05\x16\x07" + bytes(222))
+    (item,) = list(D.mdb_stem_synth(tmp_path))  # the folder above the dataset works as the root
+    assert item.id == f"mdb/{stem}" and np.allclose(item.ref_f0, 330.0)
+
+
+def test_mir1k_found_below_the_root(tmp_path):
+    base = tmp_path / "MIR-1K"
+    for d in ("Wavfile", "PitchLabel", "UndividedWavfile"):
+        (base / d).mkdir(parents=True)
+    sf.write(base / "Wavfile" / "amy_1_01.wav", np.stack([np.zeros(SR), _tone(220.0)], axis=1), SR)
+    np.savetxt(base / "PitchLabel" / "amy_1_01.pv", np.full(49, 57.0), fmt="%.4f")
+    (base / "Wavfile" / "._amy_1_01.wav").write_bytes(bytes(226))
+    (item,) = list(D.mir1k(tmp_path))
+    assert item.id == "mir1k/amy_1_01" and item.singer == "amy"
+
+
+def test_vocalset_naming_slips_in_the_released_zip(tmp_path):
+    full = tmp_path / "FULL"
+    for rel in (
+        "male9/excerpts/vibrato/m9_caro_vibrato.wav",  # male9's own take
+        "male8/excerpts/vibrato/m9_caro_vibrato.wav",  # name says m9, folder says male8: left out
+        "female2/arpeggios/vibrado/slow_vibrato_arps.wav",  # misspelt technique folder, no singer prefix
+        "female4/scales/straight/scales_straight_a.wav",  # no singer prefix: the folder decides
+    ):
+        p = full / rel
+        p.parent.mkdir(parents=True, exist_ok=True)
+        sf.write(p, _tone(200.0, 0.5), SR)
+    junk = tmp_path / "__MACOSX" / "FULL" / "female4" / "scales" / "straight" / "._scales_straight_a.wav"
+    junk.parent.mkdir(parents=True)
+    junk.write_bytes(bytes(226))
+    skipped = []
+    found = D.vocalset_files(tmp_path, skipped=skipped)
+    got = sorted((f["singer"], f["technique"], Path(f["path"]).name) for f in found)
+    assert got == [("female2", "vibrato", "slow_vibrato_arps.wav"), ("female4", "straight", "scales_straight_a.wav"),
+                   ("male9", "vibrato", "m9_caro_vibrato.wav")]
+    assert len(skipped) == 1 and "male8" in skipped[0]["path"] and "m9" in skipped[0]["reason"]
 
 
 def test_plan_split_guarantees_test_hours():

@@ -292,7 +292,7 @@ def _tracker(name: str) -> Tracker:
 
 
 def _take_descriptors(source: str, root: str | None, n_singers: int, takes_per_singer: int, seed: int,
-                      techniques: tuple[str, ...] | None) -> list[dict]:
+                      techniques: tuple[str, ...] | None, skipped: list | None = None) -> list[dict]:
     if source == "synthetic":
         out = []
         for sg in make_singers(n_singers, seed):
@@ -304,7 +304,7 @@ def _take_descriptors(source: str, root: str | None, n_singers: int, takes_per_s
     if source == "vocalset":
         from .datasets import VOCALSET_DEFAULT_TECHNIQUES, vocalset_files
 
-        files = vocalset_files(root, techniques or VOCALSET_DEFAULT_TECHNIQUES)
+        files = vocalset_files(root, techniques or VOCALSET_DEFAULT_TECHNIQUES, skipped=skipped)
         out = []
         for f in files:
             stem = Path(f["path"]).stem
@@ -473,7 +473,8 @@ def build_corpus(
     out = Path(out_dir)
     for d in ("clean", "labels", *[f"detuned/{r}" for r in routes]):
         (out / d).mkdir(parents=True, exist_ok=True)
-    descs = _take_descriptors(source, root, n_singers, takes_per_singer, seed, techniques)
+    skipped: list[dict] = []
+    descs = _take_descriptors(source, root, n_singers, takes_per_singer, seed, techniques, skipped)
     if not descs:
         raise FileNotFoundError(f"no {source} takes found under {root}")
 
@@ -525,7 +526,7 @@ def build_corpus(
         schema=SCHEMA_VERSION, source=source, root=str(root) if root else None, seed=seed, sr=sr, routes=list(routes),
         tracker=tracker, qc_tracker=qc_tracker, qc_tol_cents=qc_tol_cents, qc_min_coverage=QC_MIN_COVERAGE,
         keep_within_cents=KEEP_WITHIN_CENTS, high_detune_cents=HIGH_DETUNE_CENTS, min_label_note_s=MIN_LABEL_NOTE_S,
-        takes=len(records), failed_takes=errors, labels=len(labels), seconds=round(time.time() - t0, 1),
+        takes=len(records), failed_takes=errors, source_files_skipped=skipped, labels=len(labels), seconds=round(time.time() - t0, 1),
         versions=_versions(), git_commit=_git_commit(), created=time.strftime("%Y-%m-%dT%H:%M:%S%z"),
     )
     (out / "build_info.json").write_text(json.dumps(info, indent=2, default=str))

@@ -181,3 +181,47 @@ def test_wide_range_finds_a_low_bass_note():
     tr = B.bench_tracker("pyin").track(x, sr)
     mid = tr.raw_f0[len(tr.raw_f0) // 4: 3 * len(tr.raw_f0) // 4]
     assert np.median(np.abs(1200 * np.log2(mid / 50.0))) < 20
+
+
+def test_long_input_is_tracked_in_segments_with_the_same_result():
+    from adaptitune.pitch import trackers as T
+
+    sr = 16_000
+    t = np.arange(int(70 * sr)) / sr
+    f = 220 * 2 ** (np.sin(2 * np.pi * 0.1 * t) / 2)  # a slow +-6 semitone glide over 70 s
+    x = 0.3 * np.sin(2 * np.pi * np.cumsum(f) / sr)
+    trk = T.YinTracker()
+    whole, seg = trk._track(x, sr, 0.01), trk._track_segmented(x, sr, 0.01)
+    assert np.allclose(seg.times, whole.times) and np.allclose(seg.f0, whole.f0)
+
+
+def test_segments_bound_the_input_and_cover_every_frame_once():
+    from adaptitune.pitch import trackers as T
+
+    seen = []
+
+    class Probe(T.Tracker):
+        name = "probe"
+
+        def _track(self, y, sr, hop_s):
+            seen.append(len(y))
+            n = len(y) // int(round(sr * hop_s))
+            return T.PitchTrack(np.arange(n) * hop_s, np.full(n, 100.0), np.ones(n), hop_s, raw_f0=np.full(n, 100.0))
+
+    sr = 16_000
+    pt = Probe()._track_segmented(np.zeros(int(95.3 * sr)), sr, 0.01)
+    assert len(seen) == 4 and max(seen) <= (T.SEGMENT_S + 2 * T.SEGMENT_CONTEXT_S) * sr
+    assert len(pt.times) == 9530 and np.allclose(np.diff(pt.times), 0.01) and pt.times[0] == 0
+
+
+def test_shards_merge_to_the_unsharded_result(tmp_path):
+    from adaptitune.bench import trackers as B
+
+    full = B.run("synthetic", None, ["yin"], limit=8, out_dir=tmp_path / "full", n_boot=50)
+    for k in range(2):
+        B.run("synthetic", None, ["yin"], limit=8, out_dir=tmp_path / f"s{k}", n_boot=50, shard=f"{k}/2")
+    merged = B.merge_shards([tmp_path / "s0", tmp_path / "s1"], tmp_path / "m", "synthetic", n_boot=50)
+    for col in ("items", "clusters", "rpa", "rca", "oa", "rpa_pooled", "octave_err"):
+        assert merged[col].iloc[0] == pytest.approx(full[col].iloc[0])
+    with pytest.raises(ValueError):  # a missing shard is an error, not a smaller benchmark
+        B.merge_shards([tmp_path / "s0"], tmp_path / "m2", "synthetic")

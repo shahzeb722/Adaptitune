@@ -221,17 +221,29 @@ def add_noise(x: np.ndarray, sr: int, snr_db: float, seed: int) -> np.ndarray:
     return x + noise
 
 
-def _items(dataset: str, root: str | None, limit: int | None, seed: int = 0, noise_snr: float | None = None, mix_snr: float | None = None):
+def parse_shard(shard: str | None) -> tuple[int, int] | None:
+    """``"k/n"`` -> ``(k, n)``: run the k-th of n interleaved parts of the dataset."""
+    if not shard:
+        return None
+    k, n = (int(v) for v in str(shard).split("/"))
+    if n < 1 or not 0 <= k < n:
+        raise ValueError(f"bad shard {shard!r}: need k/n with 0 <= k < n")
+    return k, n
+
+
+def _items(dataset: str, root: str | None, limit: int | None, seed: int = 0, noise_snr: float | None = None, mix_snr: float | None = None,
+           shard: str | None = None):
     from ..audio import Audio
     from ..data import datasets as D
 
     root = root or None
+    sh = parse_shard(shard)
     if dataset == "mir1k":
-        it = D.mir1k(root, mix_snr=mix_snr)
+        it = D.mir1k(root, mix_snr=mix_snr, shard=sh)
     elif dataset == "mdb":
-        it = D.mdb_stem_synth(root)
+        it = D.mdb_stem_synth(root, shard=sh)
     elif dataset == "synthetic":
-        it = _synthetic_items(limit or 40, seed)
+        it = (x for i, x in enumerate(_synthetic_items(limit or 40, seed)) if not sh or i % sh[1] == sh[0])
     else:
         raise ValueError(dataset)
     for i, item in enumerate(it):
@@ -263,7 +275,8 @@ def _synthetic_items(n: int, seed: int):
 
 
 def _worker(name: str, dataset: str, root: str | None, limit: int | None, out_path: str, threads: int = 4,
-            noise_snr: float | None = None, mix_snr: float | None = None, audit: bool = False, seed: int = 0):
+            noise_snr: float | None = None, mix_snr: float | None = None, audit: bool = False, seed: int = 0,
+            shard: str | None = None):
     import warnings
 
     warnings.filterwarnings("ignore")
@@ -284,7 +297,7 @@ def _worker(name: str, dataset: str, root: str | None, limit: int | None, out_pa
         trk = bench_tracker(name)
         first = True
         loaded_mb = float("nan")
-        for item in _items(dataset, root, limit, seed, noise_snr, mix_snr):
+        for item in _items(dataset, root, limit, seed, noise_snr, mix_snr, shard):
             if first:  # warm-up (model load, JIT) is not part of the steady-state RTF
                 trk.track(item.audio.samples[: item.audio.sr], item.audio.sr)
                 loaded_mb = _rss_mb()
@@ -426,6 +439,7 @@ def run(
     audit: bool = False,
     n_boot: int = 2000,
     seed: int = 0,
+    shard: str | None = None,
 ) -> pd.DataFrame:
     """Benchmark ``trackers`` (default: every installed one) on one dataset condition and write
     ``<label>_per_item.csv``, ``<label>_summary.csv/.md``, ``<label>_run.json`` (machine,
@@ -438,7 +452,7 @@ def run(
     out.mkdir(parents=True, exist_ok=True)
     per_item, summary, audits, failures = [], [], [], {}
     for name in trackers:
-        res = _run_isolated(name, dataset, root, limit, threads, noise_snr=noise_snr, mix_snr=mix_snr, audit=audit, seed=seed)
+        res = _run_isolated(name, dataset, root, limit, threads, noise_snr=noise_snr, mix_snr=mix_snr, audit=audit, seed=seed, shard=shard)
         if not res.get("ok"):
             print(f"[{name}] failed: {res.get('error')}")
             failures[name] = res.get("error")
@@ -447,6 +461,7 @@ def run(
         if df.empty:
             failures[name] = "no items"
             continue
+        df["peak_mb"], df["model_mb"] = res.get("peak_mb", float("nan")), res.get("model_mb", float("nan"))
         per_item.append(df)
         summary.append(summarize(df, label, res, n_boot))
         if res.get("audit"):
@@ -457,13 +472,63 @@ def run(
     s.to_csv(out / f"{label}_summary.csv", index=False)
     (out / f"{label}_summary.md").write_text(summary_markdown(s))
     if audits:
-        a = pd.concat(audits).groupby(["tracker", "shift_ms"])[["oa", "rpa", "rpa_10"]].mean().reset_index()
+        a_items = pd.concat(audits)
+        a_items.to_csv(out / f"{label}_alignment_per_item.csv", index=False)
+        a = a_items.groupby(["tracker", "shift_ms"])[["oa", "rpa", "rpa_10"]].mean().reset_index()
         a.to_csv(out / f"{label}_alignment.csv", index=False)
-    from ..pitch.trackers import BENCH_FMAX, BENCH_FMIN
+    from ..pitch.trackers import BENCH_FMAX, BENCH_FMIN, SEGMENT_CONTEXT_S, SEGMENT_S
 
     info = dict(dataset=dataset, label=label, root=str(root) if root else None, limit=limit, noise_snr=noise_snr,
-                mix_snr=mix_snr, trackers=trackers, search_range_hz=[BENCH_FMIN, BENCH_FMAX], failures=failures,
+                mix_snr=mix_snr, trackers=trackers, search_range_hz=[BENCH_FMIN, BENCH_FMAX],
+                segment_s=SEGMENT_S, segment_context_s=SEGMENT_CONTEXT_S, shard=shard, failures=failures,
                 machine=machine_info(threads))
+    (out / f"{label}_run.json").write_text(json.dumps(json_safe(info), indent=2))
+    return s
+
+
+def merge_shards(shard_dirs: list[str | Path], out_dir: str | Path, label: str, n_boot: int = 2000) -> pd.DataFrame:
+    """Join the per-item results of ``bench-trackers --shard k/n`` runs into the files an
+    unsharded run writes. Every metric is a mean over items (or a sum, for RTF), so the
+    merged table is the same as one run over all items; peak memory is the largest of any
+    shard. Fails if a shard is missing, a stem appears twice, or the shards' settings differ."""
+    dirs = [Path(d) for d in shard_dirs]
+    infos = [json.loads((d / f"{label}_run.json").read_text()) for d in dirs]
+    same = ("dataset", "noise_snr", "mix_snr", "search_range_hz", "segment_s", "segment_context_s", "limit")
+    for i in infos[1:]:
+        diff = [k for k in same if i.get(k) != infos[0].get(k)]
+        if diff:
+            raise ValueError(f"shards differ in {diff}")
+    parts, cover = [], {}
+    for d, i in zip(dirs, infos):
+        part = pd.read_csv(d / f"{label}_per_item.csv") if (d / f"{label}_per_item.csv").exists() else pd.DataFrame(columns=["tracker"])
+        parts.append(part)
+        for t in part.tracker.unique():  # a directory may hold one tracker or several
+            cover.setdefault(t, []).append(parse_shard(i.get("shard")) or (0, 1))
+    n = max((k_n[1] for v in cover.values() for k_n in v), default=1)
+    for t, ks in cover.items():
+        if sorted(ks) != [(k, n) for k in range(n)]:
+            raise ValueError(f"{t}: need every shard 0..{n - 1} of {n} exactly once, got {sorted(ks)}")
+    df = pd.concat(parts, ignore_index=True)
+    if df.duplicated(["tracker", "item"]).any():
+        raise ValueError("an item appears in more than one shard")
+    out = Path(out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    summary = []
+    for name, g in df.groupby("tracker", sort=False):
+        mem = dict(peak_mb=float(g.peak_mb.max()), model_mb=float(g.model_mb.median()))
+        summary.append(summarize(g.reset_index(drop=True), label, mem, n_boot))
+    s = pd.DataFrame(summary)
+    df.to_csv(out / f"{label}_per_item.csv", index=False)
+    s.to_csv(out / f"{label}_summary.csv", index=False)
+    (out / f"{label}_summary.md").write_text(summary_markdown(s))
+    audit_files = [d / f"{label}_alignment_per_item.csv" for d in dirs]
+    if all(f.exists() for f in audit_files):
+        a_items = pd.concat([pd.read_csv(f) for f in audit_files], ignore_index=True)
+        a_items.to_csv(out / f"{label}_alignment_per_item.csv", index=False)
+        a_items.groupby(["tracker", "shift_ms"])[["oa", "rpa", "rpa_10"]].mean().reset_index().to_csv(out / f"{label}_alignment.csv", index=False)
+    failures = {k: v for i in infos for k, v in (i.get("failures") or {}).items()}
+    info = {**infos[0], "shard": None, "merged_from": [str(d) for d in dirs], "shards": n, "failures": failures,
+            "machines": [i.get("machine") for i in infos]}
     (out / f"{label}_run.json").write_text(json.dumps(json_safe(info), indent=2))
     return s
 
