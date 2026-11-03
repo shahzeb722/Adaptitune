@@ -15,6 +15,7 @@ import numpy as np
 from ..audio import Audio, load
 from ..correction.settings import DEFAULT
 from ..pipeline import Corrector
+from ..pitch.trackers import default_threads
 
 
 def _cpu_name() -> str:
@@ -58,6 +59,7 @@ def measure(path: str | None = None, tracker: str = "auto", repeats: int = 3) ->
         "route_shares": {k: round(float(v), 3) for k, v in res.shift.route_shares().items()},
         "cpu": _cpu_name(),
         "cores": os.cpu_count(),
+        "threads": default_threads(),
         "target": 0.5,
         "pass": best / audio.duration <= 0.5,
     }

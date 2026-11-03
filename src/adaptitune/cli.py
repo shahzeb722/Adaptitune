@@ -151,6 +151,7 @@ def main(argv=None):
     r.add_argument("inp", nargs="?")
     r.add_argument("--tracker", default="auto")
     r.add_argument("--repeats", type=int, default=3)
+    r.add_argument("--out", help="also write the result to this JSON file")
 
     sp = sub.add_parser("study-plan")
     sp.add_argument("participants", nargs="+")
@@ -253,7 +254,11 @@ def main(argv=None):
     elif a.cmd == "rtf":
         from .bench.rtf import measure
 
-        print(json.dumps(measure(a.inp, a.tracker, a.repeats), indent=2))
+        res = measure(a.inp, a.tracker, a.repeats)
+        if a.out:
+            Path(a.out).parent.mkdir(parents=True, exist_ok=True)
+            Path(a.out).write_text(json.dumps(res, indent=2))
+        print(json.dumps(res, indent=2))
     elif a.cmd == "study-plan":
         from .study.protocol import write_plan
 

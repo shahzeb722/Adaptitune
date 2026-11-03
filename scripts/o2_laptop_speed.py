@@ -5,7 +5,10 @@ from the team's reference laptop, so this script times every tracker there, at 4
 first of 8 parts of MIR-1K and the first of 24 parts of MDB-stem-synth (the same items as the
 cloud's parts 0/8 and 0/24, so the accuracy on them must also match). That is the six trackers
 of the protocol plus FCPE's ONNX export, which is how the app runs the chosen tracker (its speed
-belongs to O5). About 45 minutes.
+belongs to O5). Then it times the whole correction path the way the app runs it (FCPE through
+ONNX Runtime, the planner, WORLD/PSOLA with the quality check) on one minute of MIR-1K vocals,
+for O5. About 50 minutes. If the tracker part has already run, ``--pipeline-only`` does just
+the last step (about 2 minutes).
 
 Windows, in an Anaconda Prompt, from the unzipped repository folder:
 
@@ -30,23 +33,43 @@ import tarfile
 from pathlib import Path
 
 
-def run(cmd):
+def run(cmd, env=None):
     print(">", " ".join(cmd), flush=True)
-    subprocess.run(cmd, check=True)
+    subprocess.run(cmd, check=True, env=env)
+
+
+def join_vocals(mir1k_root: str, path: Path, seconds: float = 60.0) -> None:
+    """The vocal channel of the first MIR-1K clips, with 0.3 s gaps, until ``seconds`` long."""
+    import numpy as np
+
+    from adaptitune.audio import Audio, save
+    from adaptitune.data.datasets import mir1k
+
+    parts, total, sr = [], 0.0, 16_000
+    for item in mir1k(mir1k_root, sr=sr):
+        parts += [item.audio.samples, np.zeros(int(0.3 * sr))]
+        total += item.audio.duration + 0.3
+        if total >= seconds:
+            break
+    path.parent.mkdir(parents=True, exist_ok=True)
+    save(path, Audio(np.concatenate(parts), sr), "PCM_16")
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--mir1k", required=True, help="folder that contains MIR-1K (any depth)")
-    ap.add_argument("--mdb", required=True, help="MDB-stem-synth folder, or the .tar.gz (it is extracted next to it)")
+    ap.add_argument("--mdb", help="MDB-stem-synth folder, or the .tar.gz (it is extracted next to it)")
     ap.add_argument("--out", default="results/laptop_speed")
     ap.add_argument("--threads", type=int, default=4)
     ap.add_argument("--trackers", nargs="+", help="default: every installed tracker")
     ap.add_argument("--limit", type=int, help="only for a quick check of the setup")
+    ap.add_argument("--pipeline-only", action="store_true", help="skip the trackers; only time the full correction path")
     a = ap.parse_args()
+    if not a.pipeline_only and not a.mdb:
+        ap.error("--mdb is needed unless --pipeline-only is given")
 
-    mdb = Path(a.mdb)
-    if mdb.suffixes[-2:] == [".tar", ".gz"]:
+    mdb = Path(a.mdb or ".")
+    if not a.pipeline_only and mdb.suffixes[-2:] == [".tar", ".gz"]:
         dest = mdb.parent / "MDB-stem-synth_extracted"
         if not dest.exists():
             print(f"extracting {mdb} to {dest} (a few minutes)", flush=True)
@@ -59,9 +82,17 @@ def main():
 
     exe = [sys.executable, "-m", "adaptitune.cli"]
     out = Path(a.out)
-    for ds, root, shard in (("mir1k", a.mir1k, "0/8"), ("mdb", str(mdb), "0/24")):
-        extra = (["--trackers", *a.trackers] if a.trackers else []) + (["--limit", str(a.limit)] if a.limit else [])
-        run(exe + ["bench-trackers", "--dataset", ds, "--root", root, "--shard", shard, "--threads", str(a.threads), "--out", str(out)] + extra)
+    if not a.pipeline_only:
+        for ds, root, shard in (("mir1k", a.mir1k, "0/8"), ("mdb", str(mdb), "0/24")):
+            extra = (["--trackers", *a.trackers] if a.trackers else []) + (["--limit", str(a.limit)] if a.limit else [])
+            run(exe + ["bench-trackers", "--dataset", ds, "--root", root, "--shard", shard, "--threads", str(a.threads), "--out", str(out)] + extra)
+
+    # O5: the full correction path on real singing, pinned to the same number of threads
+    from adaptitune.bench.trackers import thread_env
+
+    vocals = out / "pipeline_input.wav"
+    join_vocals(a.mir1k, vocals)
+    run(exe + ["rtf", str(vocals), "--tracker", "fcpe-onnx", "--out", str(out / "pipeline_rtf.json")], env=thread_env(a.threads))
     zip_path = shutil.make_archive(str(out), "zip", root_dir=out)
     print(f"\nDone. Send this file back: {os.path.abspath(zip_path)}")
 
