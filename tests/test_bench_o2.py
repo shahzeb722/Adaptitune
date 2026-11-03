@@ -181,6 +181,25 @@ def test_pesto_onnx_matches_pytorch():
     assert np.median(diff) < 1.0
 
 
+def test_fcpe_onnx_matches_pytorch():
+    """The app runs FCPE through its ONNX export; it must give FCPE's frames."""
+    from adaptitune.pitch.trackers import FcpeOnnxTracker, FcpeTracker
+
+    if not (FcpeTracker.available() and FcpeOnnxTracker.available()):
+        pytest.skip("needs torchfcpe, onnxruntime and an exported model (scripts/export_onnx.py --model fcpe)")
+    from adaptitune.data.synth import SungNote, sing
+
+    s = sing([SungNote(57, 0.7, vibrato_cents=40), SungNote(62, 0.9), SungNote(64, 0.6, scoop_cents=-80)], sr=24_000, seed=2)
+    a = FcpeTracker().track(s.samples, s.sr)
+    b = FcpeOnnxTracker().track(s.samples, s.sr)
+    assert len(a.f0) == len(b.f0)
+    assert np.array_equal(a.f0 > 0, b.f0 > 0)  # the same voicing decisions
+    # the same pitch wherever there is any: in silence the latent is flat and its argmax arbitrary
+    v = a.f0 > 0
+    assert v.sum() > 0.5 * len(v)
+    assert np.max(np.abs(1200 * np.log2(a.f0[v] / b.f0[v]))) < 0.5
+
+
 def test_every_ranged_tracker_gets_the_same_search_range():
     from adaptitune.pitch.trackers import BENCH_FMAX, BENCH_FMIN, REGISTRY
 
@@ -251,4 +270,4 @@ def test_auto_is_the_tracker_o2_chose():
 
     if not REGISTRY[APP_TRACKER].available():
         pytest.skip(f"{APP_TRACKER} is not installed")
-    assert get_tracker("auto").name == APP_TRACKER == "fcpe"
+    assert get_tracker("auto").name in (APP_TRACKER, f"{APP_TRACKER}-onnx") and APP_TRACKER == "fcpe"

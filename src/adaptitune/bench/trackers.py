@@ -63,6 +63,7 @@ TRAINED_ON: dict[str, tuple[str, ...]] = {
     # FCPE was trained on M4Singer and VCTK resynthesized with DDSP; MIR-1K is only a test set
     # (Luo et al. 2025, arXiv:2509.15140)
     "fcpe": (),
+    "fcpe-onnx": (),  # the same model, exported for the app after O2 chose FCPE
     "pyin": (),
     "yin": (),
 }

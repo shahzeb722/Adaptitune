@@ -9,9 +9,9 @@ AdaptiTune corrects a recorded vocal the way classic auto-tune does: it detects 
 
 ```
  audio ─► preprocess ─► pitch tracker ─► key ─► planner ─► WORLD / PSOLA ─► corrected audio
-                         (pYIN, PESTO,          (notes,     (quality check
-                          FCPE, CREPE, ONNX)     targets,    routes each
-                                                 4 settings) segment)
+                         (FCPE via ONNX;        (notes,     (quality check
+                          pYIN, PESTO, CREPE     targets,    routes each
+                          benchmarked)           4 settings) segment)
                                      ▲                                │
                                      │ settings                       ▼
                         personalization agent ◄── reward ◄── feedback + objective scores
@@ -23,12 +23,12 @@ AdaptiTune corrects a recorded vocal the way classic auto-tune does: it detects 
 ```bash
 python3.11 -m venv .venv && source .venv/bin/activate      # Windows: .venv\Scripts\activate
 pip install -e ".[app,dev,study]"
-pytest                                                     # about 90 tests, 3-4 minutes
+pytest                                                     # about 110 tests, 2-4 minutes
 adaptitune-app                                             # the desktop app
 adaptitune correct my_take.wav fixed.wav --key "A minor"   # one file from the command line
 ```
 
-The neural trackers are optional: `pip install -e ".[neural]"` adds PESTO, FCPE and CREPE (this pulls in PyTorch). `pip install -e ".[eval]"` adds music21 for the Essen key validation (`adaptitune key-eval`). Without them the app falls back to pYIN, and with an exported ONNX model it uses ONNX Runtime and needs no PyTorch at all.
+The app's pitch tracker is **FCPE**, which the O2 benchmark chose. It runs FCPE's ONNX export with ONNX Runtime, so it needs no PyTorch: make the export once with `python scripts/export_onnx.py --model fcpe` on a machine with the neural extra (`pip install -e ".[neural]"` adds FCPE, PESTO and CREPE and pulls in PyTorch). With the neural extra installed it can also run FCPE directly. Without either it falls back to PESTO's export, then pYIN. `pip install -e ".[eval]"` adds music21 for the Essen key validation (`adaptitune key-eval`).
 
 ## What is where
 
@@ -61,16 +61,17 @@ None of the datasets are redistributed. Download them, then:
 | MedleyDB (optional) | access request at medleydb.weebly.com | More O1 singers |
 
 ```bash
-python scripts/export_onnx.py --out models/pesto.onnx                       # deployable PESTO, benchmarked as pesto-onnx
+python scripts/export_onnx.py --model pesto                                 # PESTO for ONNX Runtime, benchmarked as pesto-onnx
+python scripts/export_onnx.py --model fcpe                                  # FCPE for ONNX Runtime, what the app runs
 adaptitune bench-trackers --dataset mir1k --root data/raw/MIR-1K --audit    # O2, see docs/O2_PROTOCOL.md
 adaptitune bench-trackers --dataset mdb   --root data/raw/MDB-stem-synth --audit
 adaptitune choose-tracker --results results/trackers                        # the pre-registered rule
-adaptitune build-corpus data/corpus --source vocalset --root data/raw/VocalSet --workers 4   # O1, see docs/O1_CORPUS.md
+adaptitune build-corpus data/corpus --source vocalset --root data/raw/VocalSet --tracker fcpe --workers 4   # O1, see docs/O1_CORPUS.md
 adaptitune corpus-stats data/corpus                                         # O1_test_hours_ok, O1_singers_disjoint
 adaptitune verify-corpus data/corpus --tracker fcpe                         # every kept offset re-measured
 adaptitune key-excerpts data/raw/MIR-1K --source mir1k --out key_excerpts   # then label with tools/key_rater.html
-adaptitune calibrate data/corpus/clean/*.wav                                # WORLD quality-check threshold
-adaptitune eval-corrector data/corpus --key-source user
+python scripts/calibrate_quality.py data/corpus --tracker fcpe             # WORLD quality-check threshold, training singers only
+adaptitune eval-corrector data/corpus --tracker fcpe --measure-tracker pyin # O3 on the test singers (add --shard k/n to split it)
 ```
 
 `scripts/reproduce_results.sh` runs the whole set on synthetic singing, so it works with no downloads.

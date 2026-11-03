@@ -380,11 +380,12 @@ class PestoOnnxTracker(OnnxTracker):
     in the benchmark so the export is measured exactly as the app runs it."""
 
     name = "pesto-onnx"
+    model = "pesto"
 
     def __init__(self, path: str | None = None, **kw):
-        path = path or find_onnx_model()
+        path = path or find_onnx_model(self.model)
         if not path:
-            raise RuntimeError("no exported model found; run scripts/export_onnx.py --out models/pesto.onnx")
+            raise RuntimeError(f"no exported model found; run scripts/export_onnx.py --model {self.model}")
         super().__init__(path, **kw)
 
     @classmethod
@@ -393,7 +394,30 @@ class PestoOnnxTracker(OnnxTracker):
             import onnxruntime  # noqa: F401
         except Exception:
             return False
-        return find_onnx_model() is not None
+        return find_onnx_model(cls.model) is not None
+
+
+class FcpeOnnxTracker(PestoOnnxTracker):
+    """FCPE exported with ``scripts/export_onnx.py --model fcpe``: the same front end, network
+    and decoder as :class:`FcpeTracker`, run with ONNX Runtime, so the app needs no PyTorch.
+    Voicing and range handling are FCPE's, as in :class:`FcpeTracker`."""
+
+    name = "fcpe-onnx"
+    model = "fcpe"
+
+    def __init__(self, path: str | None = None, threshold: float = 0.006, fmin: float = FMIN, fmax: float = FMAX, **kw):
+        super().__init__(path, threshold=threshold, **kw)
+        self.fmin, self.fmax = fmin, fmax
+
+    def _track(self, y, sr, hop_s):
+        inp = self.sess.get_inputs()[0].name
+        raw, conf = self.sess.run(None, {inp: y.astype(np.float32)[None]})
+        raw = np.atleast_1d(np.clip(np.nan_to_num(raw[0].astype(np.float64)), 0, self.fmax))
+        conf = np.atleast_1d(conf[0].astype(np.float64))
+        voiced = (conf > self.threshold) & (raw > self.fmin * 0.9)
+        f0 = np.where(voiced, raw, 0.0)
+        hop = self.model_hop_s
+        return PitchTrack(np.arange(len(f0)) * hop, f0, voiced.astype(np.float64), hop, raw_f0=raw)
 
 
 REGISTRY: dict[str, type[Tracker]] = {
@@ -403,21 +427,22 @@ REGISTRY: dict[str, type[Tracker]] = {
     "fcpe": FcpeTracker,
     "crepe": CrepeTracker,
     "pesto-onnx": PestoOnnxTracker,
+    "fcpe-onnx": FcpeOnnxTracker,
 }
 
 
-def find_onnx_model() -> str | None:
-    """An exported tracker, from $ADAPTITUNE_ONNX, ~/.adaptitune/pesto.onnx, ./models/pesto.onnx
-    or next to a frozen (PyInstaller) executable."""
+def find_onnx_model(model: str = "pesto") -> str | None:
+    """An exported tracker ``<model>.onnx`` (pesto or fcpe), from $ADAPTITUNE_ONNX (PESTO) or
+    $ADAPTITUNE_FCPE_ONNX, ~/.adaptitune, ./models or next to a frozen (PyInstaller) executable."""
     import os
     import sys
     from pathlib import Path
 
-    cands = [os.environ.get("ADAPTITUNE_ONNX")]
+    cands = [os.environ.get("ADAPTITUNE_ONNX" if model == "pesto" else f"ADAPTITUNE_{model.upper()}_ONNX")]
     home = Path(os.environ.get("ADAPTITUNE_HOME", Path.home() / ".adaptitune"))
-    cands += [str(home / "pesto.onnx"), "models/pesto.onnx"]
+    cands += [str(home / f"{model}.onnx"), f"models/{model}.onnx"]
     if getattr(sys, "frozen", False):
-        cands.append(str(Path(sys.executable).parent / "models" / "pesto.onnx"))
+        cands.append(str(Path(sys.executable).parent / "models" / f"{model}.onnx"))
     for c in cands:
         if c and Path(c).is_file():
             return c
@@ -425,17 +450,19 @@ def find_onnx_model() -> str | None:
 
 
 # The tracker the O2 benchmark chose with the rule fixed in advance (docs/O2_PROTOCOL.md A6):
-# FCPE, RPA 0.988 on MIR-1K and 0.941 on MDB-stem-synth (docs/RESULTS.md). "auto" means this one.
+# FCPE, RPA 0.988 on MIR-1K and 0.941 on MDB-stem-synth (docs/RESULTS.md). "auto" means this one,
+# run through its ONNX export when that is there (the deployment path, no PyTorch needed).
 APP_TRACKER = "fcpe"
 
 
 def get_tracker(name: str = "auto", **kw) -> Tracker:
-    """'auto' is the tracker O2 chose (``APP_TRACKER``). If its package is not installed, it
-    falls back to an exported ONNX tracker, then PESTO or FCPE if PyTorch is installed, then
-    pYIN."""
+    """'auto' is the tracker O2 chose (``APP_TRACKER``): its ONNX export if one is found, else
+    the PyTorch model. If neither is installed, it falls back to the PESTO ONNX export, then
+    PESTO or FCPE if PyTorch is installed, then pYIN."""
     if name == "auto":
-        if REGISTRY[APP_TRACKER].available():
-            return REGISTRY[APP_TRACKER](**kw)
+        for cand in (f"{APP_TRACKER}-onnx", APP_TRACKER):
+            if cand in REGISTRY and REGISTRY[cand].available():
+                return REGISTRY[cand](**kw)
         onnx = find_onnx_model()
         if onnx:
             try:

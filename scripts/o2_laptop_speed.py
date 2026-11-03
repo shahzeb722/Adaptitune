@@ -3,14 +3,17 @@
 The accuracy results were computed on a cloud machine. The speed numbers in the report must come
 from the team's reference laptop, so this script times every tracker there, at 4 threads, on the
 first of 8 parts of MIR-1K and the first of 24 parts of MDB-stem-synth (the same items as the
-cloud's parts 0/8 and 0/24, so the accuracy on them must also match). About 45 minutes.
+cloud's parts 0/8 and 0/24, so the accuracy on them must also match). That is the six trackers
+of the protocol plus FCPE's ONNX export, which is how the app runs the chosen tracker (its speed
+belongs to O5). About 45 minutes.
 
 Windows, in an Anaconda Prompt, from the unzipped repository folder:
 
     conda create -n adaptitune python=3.11 -y
     conda activate adaptitune
     pip install -e .[neural,eval]
-    python scripts/export_onnx.py --out models/pesto.onnx
+    python scripts/export_onnx.py --model pesto
+    python scripts/export_onnx.py --model fcpe
     python scripts/o2_laptop_speed.py --mir1k E:\\FYP\\MIR1K --mdb E:\\FYP\\MDB-stem-synth.tar.gz
 
 It writes results/laptop_speed.zip. Send that file back; then
@@ -38,7 +41,7 @@ def main():
     ap.add_argument("--mdb", required=True, help="MDB-stem-synth folder, or the .tar.gz (it is extracted next to it)")
     ap.add_argument("--out", default="results/laptop_speed")
     ap.add_argument("--threads", type=int, default=4)
-    ap.add_argument("--trackers", nargs="+", help="default: all six")
+    ap.add_argument("--trackers", nargs="+", help="default: every installed tracker")
     ap.add_argument("--limit", type=int, help="only for a quick check of the setup")
     a = ap.parse_args()
 
@@ -50,8 +53,9 @@ def main():
             with tarfile.open(mdb) as t:
                 t.extractall(dest, filter="data")
         mdb = dest
-    if not Path("models/pesto.onnx").exists():
-        sys.exit("models/pesto.onnx is missing: run  python scripts/export_onnx.py --out models/pesto.onnx  first")
+    for model in ("pesto", "fcpe"):
+        if not Path(f"models/{model}.onnx").exists():
+            sys.exit(f"models/{model}.onnx is missing: run  python scripts/export_onnx.py --model {model}  first")
 
     exe = [sys.executable, "-m", "adaptitune.cli"]
     out = Path(a.out)
