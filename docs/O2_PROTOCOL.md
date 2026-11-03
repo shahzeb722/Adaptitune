@@ -32,7 +32,7 @@ The loaders read both datasets at 16 kHz, which is every tracker's analysis rate
 | `pesto` | PESTO (PyTorch), the `mir-1k_g7` checkpoint | 0.5 | **MIR-1K audio** (self-supervised, no labels): it is the only checkpoint PESTO ships | |
 | `pesto-onnx` | The same PESTO model exported to ONNX and run with ONNX Runtime | 0.5 | **MIR-1K audio** | What the app ships. It must match `pesto` to under 1 cent (a test checks this). |
 | `fcpe` | torchfcpe, decoded without its voicing mask so every frame has a raw pitch | 0.006 | M4Singer and VCTK only; MIR-1K is a test set in the FCPE paper | |
-| `crepe` | torchcrepe, `tiny` model | 0.4 periodicity | **MIR-1K and MDB-stem-synth** (plus Bach10, RWC-synth, MedleyDB and NSynth, per the CREPE README) | `full` is too slow for the CPU budget |
+| `crepe` | torchcrepe, `tiny` model, decoded as in the CREPE paper: Viterbi path, then the weighted mean of the path bin and its 4 neighbours on each side (see A9) | 0.4 periodicity | **MIR-1K and MDB-stem-synth** (plus Bach10, RWC-synth, MedleyDB and NSynth, per the CREPE README) | `full` is too slow for the CPU budget |
 
 **Training overlap.** A model that has already heard a benchmark set gets an inflated score there. That accuracy is still reported, but flagged, and it is left out of that tracker's selection score (A6). The overlap is recorded in `TRAINED_ON` in `src/adaptitune/bench/trackers.py`, with the source for each entry.
 
@@ -90,7 +90,24 @@ adaptitune bench-trackers --dataset mir1k --root data/raw/MIR-1K --mix-snr 0    
 adaptitune bench-trackers --dataset mir1k --root data/raw/MIR-1K --noise-snr 10 --out results/trackers
 ```
 
-Outputs per condition: `<label>_per_item.csv`, `<label>_summary.csv` and `.md`, `<label>_run.json`, and with `--audit` also `<label>_alignment.csv`. `bench-trackers` prints the table and runs `choose-tracker` on its own once both official summaries exist. `scripts/export_onnx.py --out models/pesto.onnx` must run first, or `pesto-onnx` is skipped.
+A long run can be split into interleaved parts that run side by side, then joined. The joined files are the same as one run's, because every metric is a per-item mean or sum:
+
+```bash
+for k in 0 1 2 3; do adaptitune bench-trackers --dataset mdb --root data/raw --shard $k/4 --threads 1 --audit --out results/mdb_$k & done; wait
+adaptitune bench-merge results/mdb_0 results/mdb_1 results/mdb_2 results/mdb_3 --label mdb --out results/trackers
+```
+
+Outputs per condition: `<label>_per_item.csv`, `<label>_summary.csv` and `.md`, `<label>_run.json`, and with `--audit` also `<label>_alignment.csv` and `<label>_alignment_per_item.csv`. `bench-trackers` prints the table and runs `choose-tracker` on its own once both official summaries exist. `scripts/export_onnx.py --out models/pesto.onnx` must run first, or `pesto-onnx` is skipped.
+
+### A9. Changes made on first contact with the real data
+
+These were made on 3 November 2026, after a smoke test on two MDB-stem-synth stems (`AClassicEducation_NightOwl` stems 1 and 8) and before any full run. None of them touches the selection rule, its constants, the voicing thresholds, the search range or the data.
+
+1. **Long recordings are tracked in 30 s segments**, each with 1.5 s of extra audio on both sides that is tracked and then dropped (`SEGMENT_S`, `SEGMENT_CONTEXT_S`). In the smoke test PESTO needed 5.8 GB of memory for one 171 s stem, and MDB-stem-synth has stems up to 1,061 s long. The context is longer than PESTO's longest CQT kernel (about ±1.02 s) and the other trackers' frames. On a 70 s test glide, pYIN, YIN and PESTO give identical frames with and without segments, the ONNX export differs by at most 0.001 cents, and FCPE and CREPE by at most 1 cent. The app uses the same code, so the benchmark measures what ships.
+2. **CREPE is decoded the way the CREPE paper does it.** torchcrepe's default Viterbi decoder returns the centre of the chosen 20-cent bin plus random triangular dither of up to ±20 cents. Two runs on the same audio differed by up to 37 cents, which would make CREPE's numbers irreproducible and penalize it on the 10- and 25-cent tolerances. The Viterbi path is kept, and the pitch is the salience-weighted mean of the path bin and its four neighbours on each side, as in `crepe --viterbi`.
+3. **Loaders match the released archives.** MDB-stem-synth's folders are `audio_stems/` and `annotation_stems/` (plural), and both archives carry macOS `._` files with audio file names that are not audio. Both are now handled, and each dataset is found at any depth below `--root` (`tests/test_datasets.py`).
+4. **Where it ran.** The accuracy numbers were computed on a 4-core cloud machine, split into 24 interleaved parts per tracker, each part with 1 thread and four parts at a time, then joined with `bench-merge`. The speed columns of that run come from a loaded shared machine at 1 thread. **They are not the O2 speed result**, which must come from the reference laptop at 4 threads (A4).
+5. **MIR-1K's source.** The original archive at mirlab.org now returns 404, so the team used a mirror copy (the README links the Figshare upload of `MIR-1K.rar`, article 5802891). The benchmark reads its 1,000 clips in `Wavfile/` and 1,000 files in `PitchLabel/`; `results/data_manifest_mir1k.sha256` lists the SHA-256 of every file used, so the copy can be matched later.
 
 ---
 
