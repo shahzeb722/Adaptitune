@@ -84,6 +84,24 @@ def _write_condition(out, label, rows):
     pd.DataFrame(rows).to_csv(out / f"{label}_summary.csv", index=False)
 
 
+def test_speed_can_come_from_another_machine(tmp_path):
+    """Accuracy from the big run, RTF from a timing run (the reference laptop)."""
+    acc, lap = tmp_path / "acc", tmp_path / "laptop"
+    acc.mkdir()
+    lap.mkdir()
+    for ds in ("mir1k", "mdb"):
+        # on the loaded cloud run "a" looks too slow; on the laptop it is fast enough
+        _write_condition(acc, ds, [dict(tracker="a", rpa=0.97, rtf=0.40), dict(tracker="b", rpa=0.93, rtf=0.10)])
+        _write_condition(lap, ds, [dict(tracker="a", rpa=0.97, rtf=0.12), dict(tracker="b", rpa=0.93, rtf=0.03)])
+        (lap / f"{ds}_run.json").write_text(json.dumps({"machine": {"cpu": "laptop"}}))
+    assert B.choose_tracker(acc)["tracker"] == "b"
+    c = B.choose_tracker(acc, speed_dir=lap)
+    assert c["tracker"] == "a" and c["speed_from"]["machine"]["mdb"] == {"cpu": "laptop"}
+    _write_condition(lap, "mdb", [dict(tracker="b", rpa=0.93, rtf=0.03)])
+    with pytest.raises(ValueError):  # never mix machines for one tracker
+        B.choose_tracker(acc, speed_dir=lap)
+
+
 def test_selection_rule(tmp_path):
     # five trackers: "slow" is the most accurate but too slow; "a" and "b" tie within 1 point
     def rows(ds_shift):

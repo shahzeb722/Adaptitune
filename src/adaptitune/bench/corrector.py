@@ -2,7 +2,9 @@
 (the key part of O2).
 
 O3 is measured at the fixed reference setting (full strength, in-key snapping, vibrato
-preservation on), on test-split notes only:
+preservation on), on test-split notes only. The corrected output and the clean original are
+measured with ``measure_tracker``; use a tracker other than the corrector's own so the corrector
+is not graded by the tracker it was built on.
 
 * median |error from intended semitone| <= 25 cents on notes detuned by < 50 cents,
 * vibrato rate within +-10 % and extent >= 70 % of the clean original (notes with vibrato),
@@ -11,6 +13,7 @@ preservation on), on test-split notes only:
 
 from __future__ import annotations
 
+import json
 from dataclasses import asdict
 from pathlib import Path
 
@@ -32,6 +35,8 @@ def evaluate(
     out_dir: str | Path = "results/corrector",
     max_takes: int | None = None,
     key_source: str = "user",
+    measure_tracker: str | None = None,
+    shard: tuple[int, int] | None = None,
 ) -> dict:
     """``key_source="user"`` passes the take's key from the manifest, as a user who types the
     key in would (this isolates the corrector, which is what O3 measures); ``"estimated"``
@@ -39,6 +44,7 @@ def evaluate(
     corpus = Path(corpus_dir)
     man = load_manifest(corpus)
     keys = man.drop_duplicates("take").set_index("take")["key"].to_dict()
+    tech = man.drop_duplicates("take").set_index("take")["technique"].to_dict() if "technique" in man else {}
     det_path = {(r["take"], r["route"]): r["detuned"] for _, r in man.iterrows()}
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
@@ -46,8 +52,18 @@ def evaluate(
     labels = pd.DataFrame([asdict(lb) for lb in load_labels(corpus, qc_only=True)])
     if split:
         labels = labels[labels.split == split]
+    if shard:  # every n-th take (both routes of a take stay together); join with merge_shards
+        k, n = shard
+        takes = sorted(labels["take"].unique())
+        labels = labels[labels["take"].isin(set(takes[k::n]))]
     c = Corrector(tracker)
     hop = c.hop_s
+    if measure_tracker and measure_tracker != tracker:
+        from ..pitch.trackers import get_tracker
+
+        meas = get_tracker(measure_tracker)
+    else:
+        meas = c.tracker
     rows, clean_cache = [], {}
     for k, ((take, route), g) in enumerate(labels.groupby(["take", "route"])):
         if max_takes and k >= max_takes:
@@ -55,11 +71,11 @@ def evaluate(
         det = load(corpus / det_path.get((take, route), f"detuned/{take}.wav"), normalize=False)
         if take not in clean_cache:
             clean = load(corpus / "clean" / f"{take}.wav", normalize=False)
-            clean_cache = {take: M.contour_midi(c.tracker.track(clean.samples, clean.sr, hop).f0)}
+            clean_cache = {take: M.contour_midi(meas.track(clean.samples, clean.sr, hop).f0)}
         mc = clean_cache[take]
         an = c.analyze(det, key=keys[take] if key_source == "user" else None)
         res = c.correct(an, settings, score=False)
-        out_tr = c.tracker.track(res.audio.samples, res.audio.sr, hop)
+        out_tr = meas.track(res.audio.samples, res.audio.sr, hop)
         mo = M.contour_midi(out_tr.f0)
         for _, r in g.iterrows():
             a, b = int(round(r.start / hop)), int(round(r.end / hop))
@@ -73,12 +89,40 @@ def evaluate(
                     error_cents=100 * (ctr - r.target_midi) if not np.isnan(ctr) else np.nan,
                     vib_rate_clean=r0, vib_rate_out=r1, vib_extent_clean=e0, vib_extent_out=e1,
                     key_used=an.key.name if an.key else "", key_true=keys[take], rtf=res.rtf,
+                    technique=tech.get(take, ""),
                 )
             )
     df = pd.DataFrame(rows)
     df.to_csv(out / "notes.csv", index=False)
     summ = summarize(df)
     pd.DataFrame([summ]).T.to_csv(out / "summary.csv", header=["value"])
+    (out / "run.json").write_text(json.dumps(dict(
+        corpus=str(corpus), tracker=c.tracker.name, measure_tracker=meas.name, settings=asdict(settings), split=split,
+        key_source=key_source, shard=list(shard) if shard else None, takes=int(df["take"].nunique()) if len(df) else 0,
+    ), indent=2))
+    return summ
+
+
+def merge_shards(shard_dirs: list[str | Path], out_dir: str | Path) -> dict:
+    """Join sharded ``evaluate`` runs: checks that the shards share their settings and cover
+    0..n-1 once, then summarizes all notes together."""
+    runs = [json.loads((Path(d) / "run.json").read_text()) for d in shard_dirs]
+    same = {k: {json.dumps(r[k], sort_keys=True) for r in runs} for k in ("corpus", "tracker", "measure_tracker", "settings", "split", "key_source")}
+    bad = [k for k, v in same.items() if len(v) > 1]
+    if bad:
+        raise ValueError(f"shards differ in {bad}")
+    n = {r["shard"][1] for r in runs if r["shard"]}
+    ks = sorted(r["shard"][0] for r in runs if r["shard"])
+    if len(n) != 1 or ks != list(range(next(iter(n)))):
+        raise ValueError(f"shards do not cover 0..n-1 exactly once: {ks} of {n}")
+    df = pd.concat([pd.read_csv(Path(d) / "notes.csv") for d in shard_dirs], ignore_index=True)
+    out = Path(out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    df.to_csv(out / "notes.csv", index=False)
+    summ = summarize(df)
+    pd.DataFrame([summ]).T.to_csv(out / "summary.csv", header=["value"])
+    meta = {k: runs[0][k] for k in same}
+    (out / "run.json").write_text(json.dumps(dict(meta, merged_from=[str(d) for d in shard_dirs], takes=int(df["take"].nunique())), indent=2))
     return summ
 
 

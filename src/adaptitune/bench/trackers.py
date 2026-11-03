@@ -566,8 +566,13 @@ def choose_tracker(
     max_rtf: float = MAX_TRACKER_RTF,
     tie_pp: float = TIE_PP,
     trained_on: dict[str, tuple[str, ...]] | None = None,
+    speed_dir: str | Path | None = None,
 ) -> dict:
     """Apply the pre-registered selection rule (docs/O2_PROTOCOL.md) to saved results.
+
+    ``speed_dir`` takes the RTF of every tracker and dataset from another run, for example a
+    timing run on the reference laptop, while accuracy comes from ``out_dir``. A tracker or
+    dataset missing from the speed run makes the choice fail rather than mix machines.
 
     1. Eligible: tracker RTF <= ``max_rtf`` on every dataset.
     2. Score: mean RPA (50 cents, voicing-independent) over the datasets the tracker was not
@@ -604,6 +609,20 @@ def choose_tracker(
     for ds, s in sums.items():
         part = s.set_index("tracker")[["rpa", "rtf"]].rename(columns={"rpa": f"rpa_{ds}", "rtf": f"rtf_{ds}"})
         table = part if table is None else table.join(part, how="inner")
+    speed_from = None
+    if speed_dir is not None:
+        speed_from = {}
+        for ds in sums:
+            sp, _ = _load_condition(Path(speed_dir), ds)
+            if sp is None:
+                raise FileNotFoundError(f"no {ds} timing run in {speed_dir}")
+            sp = sp.set_index("tracker")
+            missing = [t for t in table.index if t not in sp.index]
+            if missing:
+                raise ValueError(f"the timing run in {speed_dir} has no {ds} result for {missing}")
+            table[f"rtf_{ds}"] = sp.loc[table.index, "rtf"].values
+            run = Path(speed_dir) / f"{ds}_run.json"
+            speed_from[ds] = json.loads(run.read_text()).get("machine") if run.exists() else None
     rpa_cols = [c for c in table if c.startswith("rpa_")]
     rtf_cols = [c for c in table if c.startswith("rtf_")]
 
@@ -641,6 +660,7 @@ def choose_tracker(
         "table": json.loads(table.reset_index().to_json(orient="records")),
         "trackers_reported_on_both": n_both,
         "chosen_rpa_mdb": mdb_rpa,
+        "speed_from": None if speed_dir is None else {"dir": str(speed_dir), "machine": speed_from},
         "O2_tracker_pass": bool(official and n_both >= O2_MIN_TRACKERS and mdb_rpa >= O2_MIN_MDB_RPA),
     }
     if note:

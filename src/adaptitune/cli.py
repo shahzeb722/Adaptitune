@@ -94,6 +94,7 @@ def main(argv=None):
 
     ct = sub.add_parser("choose-tracker", help="O2: apply the pre-registered selection rule to saved results")
     ct.add_argument("--results", default="results/trackers")
+    ct.add_argument("--speed", help="take every RTF from this timing run (e.g. on the reference laptop)")
     ct.add_argument("--out", default="results/chosen_tracker.json")
 
     e = sub.add_parser("eval-corrector")
@@ -103,6 +104,12 @@ def main(argv=None):
     e.add_argument("--key-source", default="user", choices=["user", "estimated"])
     e.add_argument("--out", default="results/corrector")
     e.add_argument("--max-takes", type=int)
+    e.add_argument("--measure-tracker", help="tracker that measures the output (default: the corrector's own)")
+    e.add_argument("--shard", help="k/n: only every n-th take, starting at k (join with eval-corrector-merge)")
+
+    em = sub.add_parser("eval-corrector-merge", help="O3: join sharded eval-corrector runs")
+    em.add_argument("dirs", nargs="+")
+    em.add_argument("--out", default="results/corrector")
 
     k = sub.add_parser("eval-keys", help="O2: key accuracy on the hand-labelled excerpts")
     k.add_argument("labels")
@@ -199,13 +206,18 @@ def main(argv=None):
     elif a.cmd == "choose-tracker":
         from .bench.trackers import choose_tracker, json_safe, save_choice
 
-        choice = choose_tracker(a.results)
+        choice = choose_tracker(a.results, speed_dir=a.speed)
         save_choice(choice, a.out)
         print(json.dumps(json_safe({k: v for k, v in choice.items() if k != "table"}), indent=2))
     elif a.cmd == "eval-corrector":
         from .bench.corrector import evaluate
+        from .bench.trackers import parse_shard
 
-        print(json.dumps(evaluate(a.corpus, a.tracker, split=a.split or None, out_dir=a.out, max_takes=a.max_takes, key_source=a.key_source), indent=2))
+        print(json.dumps(evaluate(a.corpus, a.tracker, split=a.split or None, out_dir=a.out, max_takes=a.max_takes, key_source=a.key_source, measure_tracker=a.measure_tracker, shard=parse_shard(a.shard) if a.shard else None), indent=2, default=float))
+    elif a.cmd == "eval-corrector-merge":
+        from .bench.corrector import merge_shards
+
+        print(json.dumps(merge_shards(a.dirs, a.out), indent=2, default=float))
     elif a.cmd == "eval-keys":
         from .bench.key_labels import evaluate_key_labels
 

@@ -9,6 +9,9 @@ import numpy as np
 NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 MAJOR_STEPS = (0, 2, 4, 5, 7, 9, 11)
 MINOR_STEPS = (0, 2, 3, 5, 7, 8, 10)  # natural minor
+# Sung minor-key melodies also use the raised 6th and 7th (melodic and harmonic minor, e.g. the
+# leading tone G# in A minor), so in-key snapping in a minor key allows them too.
+MINOR_RAISED_STEPS = (9, 11)
 
 
 def hz_to_midi(f: np.ndarray | float) -> np.ndarray:
@@ -36,6 +39,14 @@ class Key:
     def pitch_classes(self) -> tuple[int, ...]:
         steps = MAJOR_STEPS if self.mode == "major" else MINOR_STEPS
         return tuple((self.tonic + s) % 12 for s in steps)
+
+    @property
+    def snap_classes(self) -> tuple[int, ...]:
+        """Pitch classes in-key snapping may choose: the scale, plus the raised 6th and 7th
+        in a minor key. Key estimation and key comparisons use ``pitch_classes``."""
+        if self.mode == "major":
+            return self.pitch_classes
+        return tuple(sorted(set(self.pitch_classes) | {(self.tonic + s) % 12 for s in MINOR_RAISED_STEPS}))
 
     @property
     def name(self) -> str:
@@ -69,13 +80,15 @@ class Key:
 
 
 def nearest_in_scale(midi: float, key: Key | None) -> int:
-    """Nearest semitone (chromatic if key is None) to a fractional MIDI value."""
+    """Nearest semitone (chromatic if key is None) to a fractional MIDI value, among the key's
+    ``snap_classes`` otherwise."""
     if key is None:
         return int(np.round(midi))
+    allowed = key.snap_classes
     base = int(np.floor(midi))
     best, best_d = base, 1e9
     for cand in range(base - 2, base + 3):
-        if cand % 12 in key.pitch_classes:
+        if cand % 12 in allowed:
             d = abs(cand - midi)
             if d < best_d - 1e-9:
                 best, best_d = cand, d

@@ -115,3 +115,20 @@ def test_takes_are_reproducible_and_order_independent(corpus, tmp_path):
     a = [lb for lb in T.load_labels(one)]
     b = [lb for lb in T.load_labels(corpus) if lb.take == a[0].take]
     assert [(x.index, x.route, x.offset_cents, x.qc_residual_cents) for x in a] == [(x.index, x.route, x.offset_cents, x.qc_residual_cents) for x in b]
+
+
+def test_corrector_eval_shards_merge_to_the_unsharded_result(corpus, tmp_path):
+    """O3 on a corpus: two shards joined give the same notes and summary as one run, and the
+    output can be measured with a tracker other than the corrector's own."""
+    from adaptitune.bench import corrector as BC
+
+    full = BC.evaluate(corpus, "yin", split=None, out_dir=tmp_path / "full", measure_tracker="pyin")
+    parts = [BC.evaluate(corpus, "yin", split=None, out_dir=tmp_path / f"s{k}", measure_tracker="pyin", shard=(k, 2)) for k in range(2)]
+    assert all(p["takes"] >= 1 for p in parts)
+    merged = BC.merge_shards([tmp_path / "s1", tmp_path / "s0"], tmp_path / "merged")
+    assert merged["notes"] == full["notes"] and merged["takes"] == full["takes"]
+    assert merged["median_abs_err_lt50"] == pytest.approx(full["median_abs_err_lt50"])
+    run = json.loads((tmp_path / "merged" / "run.json").read_text())
+    assert run["tracker"] == "yin" and run["measure_tracker"] == "pyin"
+    with pytest.raises(ValueError):
+        BC.merge_shards([tmp_path / "s0"], tmp_path / "bad")
