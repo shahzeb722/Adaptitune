@@ -75,6 +75,7 @@ def evaluate(
         mc = clean_cache[take]
         an = c.analyze(det, key=keys[take] if key_source == "user" else None)
         res = c.correct(an, settings, score=False)
+        shares = res.shift.route_shares()  # how much of the voiced audio the corrector sent to each shifter
         snap_pcs = set(an.key.snap_classes) if an.key else set(range(12))
         out_tr = meas.track(res.audio.samples, res.audio.sr, hop)
         mo = M.contour_midi(out_tr.f0)
@@ -91,6 +92,7 @@ def evaluate(
                     vib_rate_clean=r0, vib_rate_out=r1, vib_extent_clean=e0, vib_extent_out=e1,
                     key_used=an.key.name if an.key else "", key_true=keys[take], rtf=res.rtf,
                     technique=tech.get(take, ""), target_in_key=int(r.target_midi) % 12 in snap_pcs,
+                    corrector_world_share=shares["world"], corrector_psola_share=shares["psola"],
                 )
             )
     df = pd.DataFrame(rows)
@@ -151,6 +153,8 @@ def summarize(df: pd.DataFrame) -> dict:
         "median_vibrato_extent_ratio": float((has_vib.vib_extent_out / has_vib.vib_extent_clean).median()) if len(has_vib) else float("nan"),
         "mean_rtf": float(df.groupby(["take", "route"]).rtf.first().mean()),
     }
+    if "corrector_world_share" in df:  # share of voiced audio the quality check kept on WORLD
+        s["corrector_world_share"] = float(df.groupby(["take", "route"]).corrector_world_share.first().mean())
     for route, g in low.groupby("route"):
         s[f"median_abs_err_lt50_{route}"] = float(g.abs_err.median())
     if "target_in_key" in df:

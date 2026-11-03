@@ -128,6 +128,9 @@ def test_corrector_eval_shards_merge_to_the_unsharded_result(corpus, tmp_path):
     merged = BC.merge_shards([tmp_path / "s1", tmp_path / "s0"], tmp_path / "merged")
     assert merged["notes"] == full["notes"] and merged["takes"] == full["takes"]
     assert merged["median_abs_err_lt50"] == pytest.approx(full["median_abs_err_lt50"])
+    # the corrector's own WORLD/PSOLA split is recorded per take and summarized
+    assert 0 <= full["corrector_world_share"] <= 1
+    assert merged["corrector_world_share"] == pytest.approx(full["corrector_world_share"])
     run = json.loads((tmp_path / "merged" / "run.json").read_text())
     assert run["tracker"] == "yin" and run["measure_tracker"] == "pyin"
     with pytest.raises(ValueError):
