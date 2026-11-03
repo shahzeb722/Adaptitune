@@ -1,247 +1,423 @@
 {
  "tracker": "fcpe",
  "independent_of_build_qc": true,
- "labels_total": 9262,
- "labels_failed_build_qc": 865,
- "build_qc_pass_share": 0.9066076441373353,
- "notes_checked": 8397,
- "recovered_share": 0.9966654757651542,
- "median_abs_residual_cents": 0.84,
- "p95_abs_residual_cents": 3.65,
+ "labels_total": 17832,
+ "labels_failed_build_qc": 1821,
+ "build_qc_pass_share": 0.8978802153432033,
+ "notes_checked": 16011,
+ "recovered_share": 0.9947536068952595,
+ "median_abs_residual_cents": 0.75,
+ "p95_abs_residual_cents": 3.58,
  "by_route": {
   "psola": {
-   "recovered_share": 0.9983720930232558,
-   "median_abs_residual_cents": 0.97
+   "recovered_share": 0.9949581898671913,
+   "median_abs_residual_cents": 0.82
   },
   "world": {
-   "recovered_share": 0.9948742982670247,
-   "median_abs_residual_cents": 0.75
+   "recovered_share": 0.9945424546262216,
+   "median_abs_residual_cents": 0.68
   }
  },
  "failures": [
   {
-   "take": "vocalset__female1__scales__slow_piano__f1_scales_f_slow_piano_e",
-   "index": 9,
-   "route": "psola",
-   "residual": -10.6,
-   "coverage": 1.0,
-   "reason": "offset_mismatch"
-  },
-  {
-   "take": "vocalset__female2__scales__slow_forte__f2_scales_f_slow_forte_u",
-   "index": 15,
-   "route": "psola",
-   "residual": -1200.37,
-   "coverage": 1.0,
-   "reason": "octave_error"
-  },
-  {
-   "take": "vocalset__female2__scales__vibrato__f2_scales_vibrato_u",
-   "index": 23,
-   "route": "psola",
-   "residual": 12.66,
-   "coverage": 1.0,
-   "reason": "offset_mismatch"
-  },
-  {
-   "take": "vocalset__female2__scales__vibrato__f2_scales_vibrato_u",
-   "index": 23,
+   "take": "vocalset__female1__arpeggios__slow_forte__f1_arpeggios_c_slow_forte_a",
+   "index": 20,
    "route": "world",
-   "residual": 18.49,
+   "residual": -11.25,
    "coverage": 1.0,
    "reason": "offset_mismatch"
   },
   {
-   "take": "vocalset__female3__scales__slow_piano__f3_scales_c_slow_piano_a",
+   "take": "vocalset__female1__scales__slow_forte__f1_scales_f_slow_forte_e",
+   "index": 27,
+   "route": "psola",
+   "residual": -79.24,
+   "coverage": 1.0,
+   "reason": "offset_mismatch"
+  },
+  {
+   "take": "vocalset__female1__scales__slow_piano__f1_scales_f_slow_piano_i",
+   "index": 26,
+   "route": "psola",
+   "residual": 15.97,
+   "coverage": 1.0,
+   "reason": "offset_mismatch"
+  },
+  {
+   "take": "vocalset__female2__arpeggios__slow_forte__f2_arpeggios_c_slow_forte_o",
+   "index": 2,
+   "route": "world",
+   "residual": -10.21,
+   "coverage": 1.0,
+   "reason": "offset_mismatch"
+  },
+  {
+   "take": "vocalset__female2__scales__slow_piano__f2_scales_c_slow_piano_a",
    "index": 6,
    "route": "psola",
-   "residual": 13.01,
+   "residual": -10.17,
+   "coverage": 1.0,
+   "reason": "offset_mismatch"
+  },
+  {
+   "take": "vocalset__female2__scales__slow_piano__f2_scales_f_slow_piano_u",
+   "index": 21,
+   "route": "psola",
+   "residual": 10.19,
+   "coverage": 1.0,
+   "reason": "offset_mismatch"
+  },
+  {
+   "take": "vocalset__female2__scales__vibrato__f2_scales_vibrato_u",
+   "index": 16,
+   "route": "psola",
+   "residual": 10.97,
+   "coverage": 1.0,
+   "reason": "offset_mismatch"
+  },
+  {
+   "take": "vocalset__female2__scales__vibrato__f2_scales_vibrato_u",
+   "index": 16,
+   "route": "world",
+   "residual": 16.14,
+   "coverage": 1.0,
+   "reason": "offset_mismatch"
+  },
+  {
+   "take": "vocalset__female3__excerpts__vibrato__f3_caro_vibrato",
+   "index": 34,
+   "route": "world",
+   "residual": -12.52,
+   "coverage": 1.0,
+   "reason": "offset_mismatch"
+  },
+  {
+   "take": "vocalset__female3__excerpts__vibrato__f3_row_vibrato",
+   "index": 26,
+   "route": "psola",
+   "residual": 25.22,
    "coverage": 1.0,
    "reason": "offset_mismatch"
   },
   {
    "take": "vocalset__female3__scales__vibrato__f3_scales_vibrato_a",
-   "index": 7,
+   "index": 10,
    "route": "psola",
-   "residual": 15.91,
+   "residual": 10.9,
    "coverage": 1.0,
    "reason": "offset_mismatch"
   },
   {
-   "take": "vocalset__female4__arpeggios__slow_forte__f4_arpeggios_f_slow_forte_a",
-   "index": 5,
+   "take": "vocalset__female3__scales__vibrato__f3_scales_vibrato_o",
+   "index": 17,
    "route": "psola",
-   "residual": -14.26,
+   "residual": 10.4,
    "coverage": 1.0,
    "reason": "offset_mismatch"
   },
   {
-   "take": "vocalset__female4__excerpts__vibrato__f4_caro_vibrato",
-   "index": 8,
-   "route": "world",
-   "residual": 11.85,
-   "coverage": 1.0,
-   "reason": "offset_mismatch"
-  },
-  {
-   "take": "vocalset__female9__scales__slow_forte__f9_scales_f_slow_forte_i",
-   "index": 13,
+   "take": "vocalset__female4__excerpts__straight__f4_caro_straight",
+   "index": 31,
    "route": "psola",
-   "residual": -13.97,
+   "residual": 13.62,
    "coverage": 1.0,
    "reason": "offset_mismatch"
   },
   {
-   "take": "vocalset__male10__arpeggios__slow_forte__m10_arpeggios_f_slow_forte_u",
-   "index": 27,
+   "take": "vocalset__female4__excerpts__straight__f4_caro_straight",
+   "index": 3,
    "route": "world",
-   "residual": 1196.94,
+   "residual": -37.65,
    "coverage": 1.0,
-   "reason": "octave_error"
+   "reason": "offset_mismatch"
   },
   {
-   "take": "vocalset__male10__scales__slow_forte__m10_scales_c_slow_forte_e",
-   "index": 8,
-   "route": "world",
-   "residual": 1200.91,
+   "take": "vocalset__female4__scales__slow_piano__f4_scales_c_slow_piano_o",
+   "index": 12,
+   "route": "psola",
+   "residual": -11.18,
    "coverage": 1.0,
-   "reason": "octave_error"
+   "reason": "offset_mismatch"
   },
   {
-   "take": "vocalset__male10__scales__slow_forte__m10_scales_c_slow_forte_o",
-   "index": 26,
-   "route": "world",
-   "residual": 1195.27,
+   "take": "vocalset__female5__excerpts__vibrato__f5_dona_vibrato",
+   "index": 37,
+   "route": "psola",
+   "residual": 17.18,
    "coverage": 1.0,
-   "reason": "octave_error"
+   "reason": "offset_mismatch"
   },
   {
-   "take": "vocalset__male10__scales__slow_forte__m10_scales_f_slow_forte_o",
+   "take": "vocalset__female5__excerpts__vibrato__f5_dona_vibrato",
    "index": 37,
    "route": "world",
-   "residual": 1187.58,
+   "residual": -11.01,
    "coverage": 1.0,
+   "reason": "offset_mismatch"
+  },
+  {
+   "take": "vocalset__female5__excerpts__vibrato__f5_row_vibrato",
+   "index": 45,
+   "route": "psola",
+   "residual": 46.0,
+   "coverage": 1.0,
+   "reason": "offset_mismatch"
+  },
+  {
+   "take": "vocalset__female5__excerpts__vibrato__f5_row_vibrato",
+   "index": 45,
+   "route": "world",
+   "residual": 20.03,
+   "coverage": 1.0,
+   "reason": "offset_mismatch"
+  },
+  {
+   "take": "vocalset__female5__scales__vibrato__f5_scales_vibrato_o",
+   "index": 2,
+   "route": "psola",
+   "residual": -10.24,
+   "coverage": 1.0,
+   "reason": "offset_mismatch"
+  },
+  {
+   "take": "vocalset__female6__excerpts__vibrato__f6_row_vibrato",
+   "index": 2,
+   "route": "psola",
+   "residual": 16.34,
+   "coverage": 1.0,
+   "reason": "offset_mismatch"
+  },
+  {
+   "take": "vocalset__female6__excerpts__vibrato__f6_row_vibrato",
+   "index": 2,
+   "route": "world",
+   "residual": 11.5,
+   "coverage": 1.0,
+   "reason": "offset_mismatch"
+  },
+  {
+   "take": "vocalset__female7__scales__slow_piano__f7_scales_c_slow_piano",
+   "index": 2,
+   "route": "world",
+   "residual": 13.67,
+   "coverage": 1.0,
+   "reason": "offset_mismatch"
+  },
+  {
+   "take": "vocalset__female8__excerpts__vibrato__f8_row_vibrato",
+   "index": 15,
+   "route": "psola",
+   "residual": 23.95,
+   "coverage": 1.0,
+   "reason": "offset_mismatch"
+  },
+  {
+   "take": "vocalset__female8__excerpts__vibrato__f8_row_vibrato",
+   "index": 15,
+   "route": "world",
+   "residual": 10.87,
+   "coverage": 1.0,
+   "reason": "offset_mismatch"
+  },
+  {
+   "take": "vocalset__female8__scales__slow_forte__f8_scales_c_slow_forte_a",
+   "index": 5,
+   "route": "world",
+   "residual": -12.56,
+   "coverage": 1.0,
+   "reason": "offset_mismatch"
+  },
+  {
+   "take": "vocalset__female9__excerpts__vibrato__f9_caro_vibrato",
+   "index": 11,
+   "route": "psola",
+   "residual": 12.21,
+   "coverage": 1.0,
+   "reason": "offset_mismatch"
+  },
+  {
+   "take": "vocalset__female9__excerpts__vibrato__f9_caro_vibrato",
+   "index": 41,
+   "route": "psola",
+   "residual": 84.1,
+   "coverage": 1.0,
+   "reason": "offset_mismatch"
+  },
+  {
+   "take": "vocalset__female9__excerpts__vibrato__f9_caro_vibrato",
+   "index": 44,
+   "route": "psola",
+   "residual": 47.14,
+   "coverage": 0.9,
+   "reason": "offset_mismatch"
+  },
+  {
+   "take": "vocalset__female9__scales__slow_forte__f9_scales_c_slow_forte_a",
+   "index": 12,
+   "route": "world",
+   "residual": -10.64,
+   "coverage": 1.0,
+   "reason": "offset_mismatch"
+  },
+  {
+   "take": "vocalset__male10__excerpts__straight__m10_caro_straight",
+   "index": 41,
+   "route": "psola",
+   "residual": 14.58,
+   "coverage": 1.0,
+   "reason": "offset_mismatch"
+  },
+  {
+   "take": "vocalset__male10__excerpts__vibrato__caro_vibrato",
+   "index": 26,
+   "route": "psola",
+   "residual": 14.07,
+   "coverage": 1.0,
+   "reason": "offset_mismatch"
+  },
+  {
+   "take": "vocalset__male10__excerpts__vibrato__caro_vibrato",
+   "index": 32,
+   "route": "world",
+   "residual": 15.08,
+   "coverage": 1.0,
+   "reason": "offset_mismatch"
+  },
+  {
+   "take": "vocalset__male10__scales__slow_forte__m10_scales_c_slow_forte_u",
+   "index": 13,
+   "route": "world",
+   "residual": 11.68,
+   "coverage": 1.0,
+   "reason": "offset_mismatch"
+  },
+  {
+   "take": "vocalset__male10__scales__slow_piano__m10_scales_f_slow_piano_a",
+   "index": 7,
+   "route": "world",
+   "residual": -11.5,
+   "coverage": 1.0,
+   "reason": "offset_mismatch"
+  },
+  {
+   "take": "vocalset__male10__scales__vibrato__m10_scales_vibrato_e",
+   "index": 11,
+   "route": "world",
+   "residual": 1206.28,
+   "coverage": 0.978,
    "reason": "octave_error"
   },
   {
-   "take": "vocalset__male10__scales__slow_forte__m10_scales_f_slow_forte_u",
+   "take": "vocalset__male11__arpeggios__vibrato__m11_arpeggios_vibrato_a",
+   "index": 23,
+   "route": "psola",
+   "residual": 24.96,
+   "coverage": 1.0,
+   "reason": "offset_mismatch"
+  },
+  {
+   "take": "vocalset__male11__excerpts__straight__m11_caro_straight",
    "index": 36,
+   "route": "psola",
+   "residual": 39.36,
+   "coverage": 1.0,
+   "reason": "offset_mismatch"
+  },
+  {
+   "take": "vocalset__male11__excerpts__straight__m11_row_straight",
+   "index": 33,
    "route": "world",
-   "residual": 1203.6,
+   "residual": -10.92,
+   "coverage": 1.0,
+   "reason": "offset_mismatch"
+  },
+  {
+   "take": "vocalset__male11__scales__slow_forte__m11_scales_c_slow_forte_u",
+   "index": 23,
+   "route": "psola",
+   "residual": 13.55,
+   "coverage": 0.944,
+   "reason": "offset_mismatch"
+  },
+  {
+   "take": "vocalset__male1__excerpts__straight__m1_dona_straight",
+   "index": 22,
+   "route": "psola",
+   "residual": 19.39,
+   "coverage": 1.0,
+   "reason": "offset_mismatch"
+  },
+  {
+   "take": "vocalset__male1__excerpts__straight__m1_dona_straight",
+   "index": 22,
+   "route": "world",
+   "residual": -17.13,
+   "coverage": 1.0,
+   "reason": "offset_mismatch"
+  },
+  {
+   "take": "vocalset__male1__excerpts__vibrato__m1_caro_vibrato",
+   "index": 60,
+   "route": "psola",
+   "residual": 29.18,
+   "coverage": 1.0,
+   "reason": "offset_mismatch"
+  },
+  {
+   "take": "vocalset__male1__scales__slow_piano__m1_scales_f_slow_piano_u",
+   "index": 20,
+   "route": "world",
+   "residual": 11.14,
+   "coverage": 1.0,
+   "reason": "offset_mismatch"
+  },
+  {
+   "take": "vocalset__male2__arpeggios__slow_piano__m2_arpeggios_c_slow_piano_o",
+   "index": 12,
+   "route": "world",
+   "residual": 1185.45,
    "coverage": 1.0,
    "reason": "octave_error"
   },
   {
-   "take": "vocalset__male10__scales__vibrato__m10_scales_vibrato_u",
-   "index": 31,
+   "take": "vocalset__male2__excerpts__straight__m2_caro_straight",
+   "index": 24,
    "route": "world",
-   "residual": 1300.01,
+   "residual": 13.32,
    "coverage": 1.0,
-   "reason": "octave_error"
+   "reason": "offset_mismatch"
   },
   {
-   "take": "vocalset__male2__arpeggios__straight__m2_arpeggios_straight_i",
-   "index": 1,
+   "take": "vocalset__male2__excerpts__straight__m2_row_straight",
+   "index": 2,
    "route": "world",
-   "residual": 1189.64,
+   "residual": -15.97,
+   "coverage": 1.0,
+   "reason": "offset_mismatch"
+  },
+  {
+   "take": "vocalset__male3__scales__slow_forte__m3_scales_c_slow_forte_u",
+   "index": 17,
+   "route": "world",
+   "residual": 1192.13,
    "coverage": 1.0,
    "reason": "octave_error"
   },
   {
    "take": "vocalset__male3__scales__slow_piano__m3_scales_c_slow_piano_o",
-   "index": 14,
+   "index": 17,
    "route": "world",
-   "residual": 1191.41,
+   "residual": 1200.65,
    "coverage": 1.0,
    "reason": "octave_error"
   },
   {
    "take": "vocalset__male4__arpeggios__slow_forte__m4_arpeggios_f_slow_forte_u",
-   "index": 21,
-   "route": "world",
-   "residual": 1199.12,
-   "coverage": 1.0,
-   "reason": "octave_error"
-  },
-  {
-   "take": "vocalset__male4__arpeggios__straight__m4_arpeggios_straight_u",
-   "index": 3,
-   "route": "world",
-   "residual": 1202.0,
-   "coverage": 1.0,
-   "reason": "octave_error"
-  },
-  {
-   "take": "vocalset__male4__arpeggios__straight__m4_arpeggios_straight_u",
-   "index": 8,
-   "route": "world",
-   "residual": 1207.6,
-   "coverage": 1.0,
-   "reason": "octave_error"
-  },
-  {
-   "take": "vocalset__male6__arpeggios__vibrato__m6_arpeggios_vibrato_e",
-   "index": 3,
-   "route": "world",
-   "residual": -14.29,
-   "coverage": 1.0,
-   "reason": "offset_mismatch"
-  },
-  {
-   "take": "vocalset__male7__long_tones__messa__m7_long_messa_e",
-   "index": 9,
-   "route": "world",
-   "residual": 1193.58,
-   "coverage": 1.0,
-   "reason": "octave_error"
-  },
-  {
-   "take": "vocalset__male7__long_tones__messa__m7_long_messa_o",
-   "index": 9,
-   "route": "world",
-   "residual": 1195.63,
-   "coverage": 1.0,
-   "reason": "octave_error"
-  },
-  {
-   "take": "vocalset__male7__long_tones__straight__m7_long_straight_e",
-   "index": 9,
-   "route": "world",
-   "residual": 1198.08,
-   "coverage": 1.0,
-   "reason": "octave_error"
-  },
-  {
-   "take": "vocalset__male7__long_tones__straight__m7_long_straight_o",
    "index": 13,
    "route": "world",
-   "residual": 1190.92,
+   "residual": 1192.03,
    "coverage": 1.0,
    "reason": "octave_error"
-  },
-  {
-   "take": "vocalset__male7__scales__slow_forte__m7_scales_f_slow_forte_a",
-   "index": 12,
-   "route": "world",
-   "residual": 1198.0,
-   "coverage": 1.0,
-   "reason": "octave_error"
-  },
-  {
-   "take": "vocalset__male7__scales__slow_forte__m7_scales_f_slow_forte_e",
-   "index": 11,
-   "route": "world",
-   "residual": 1198.44,
-   "coverage": 1.0,
-   "reason": "octave_error"
-  },
-  {
-   "take": "vocalset__male7__scales__slow_forte__m7_scales_f_slow_forte_o",
-   "index": 10,
-   "route": "world",
-   "residual": 23.58,
-   "coverage": 1.0,
-   "reason": "offset_mismatch"
   }
  ],
  "tolerance_cents": 10.0,

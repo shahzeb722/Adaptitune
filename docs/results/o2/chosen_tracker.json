@@ -1,0 +1,90 @@
+{
+  "tracker": "fcpe",
+  "official": true,
+  "datasets": [
+    "mir1k",
+    "mdb"
+  ],
+  "rule": "eligible if tracker RTF <= 0.25 on every dataset; score = mean RPA over the datasets the tracker was not trained on; highest score wins; ties within 1.0 RPA points go to the faster tracker",
+  "best_by_accuracy": "fcpe",
+  "runner_up": "yin",
+  "paired_difference_vs_runner_up": {
+    "mir1k": {
+      "mean_rpa_difference": 0.02815802715836355,
+      "ci95": [
+        0.02272525818482646,
+        0.034136213067006295
+      ]
+    },
+    "mdb": {
+      "mean_rpa_difference": 0.05020771143575156,
+      "ci95": [
+        0.03452299852172206,
+        0.06785080290064303
+      ]
+    }
+  },
+  "chosen_if_training_overlap_ignored": "fcpe",
+  "table": [
+    {
+      "tracker": "pyin",
+      "rpa_mir1k": 0.9656161704,
+      "rtf_mir1k": 0.4120102223,
+      "rpa_mdb": 0.8928640399,
+      "rtf_mdb": 0.3117008044,
+      "trained_on": "",
+      "score_datasets": "mir1k,mdb",
+      "score": 0.9292401051,
+      "score_all": 0.9292401051,
+      "rtf_max": 0.4120102223,
+      "rtf_mean": 0.3618555133,
+      "eligible": false
+    },
+    {
+      "tracker": "pesto-onnx",
+      "rpa_mir1k": 0.9826312877,
+      "rtf_mir1k": 0.1711138619,
+      "rpa_mdb": 0.8819314777,
+      "rtf_mdb": 0.162716644,
+      "trained_on": "mir1k",
+      "score_datasets": "mdb",
+      "score": 0.8819314777,
+      "score_all": 0.9322813827,
+      "rtf_max": 0.1711138619,
+      "rtf_mean": 0.1669152529,
+      "eligible": true
+    },
+    {
+      "tracker": "fcpe",
+      "rpa_mir1k": 0.9884500699,
+      "rtf_mir1k": 0.0496484945,
+      "rpa_mdb": 0.9412041996,
+      "rtf_mdb": 0.0862451211,
+      "trained_on": "",
+      "score_datasets": "mir1k,mdb",
+      "score": 0.9648271347,
+      "score_all": 0.9648271347,
+      "rtf_max": 0.0862451211,
+      "rtf_mean": 0.0679468078,
+      "eligible": true
+    },
+    {
+      "tracker": "yin",
+      "rpa_mir1k": 0.9602920427,
+      "rtf_mir1k": 0.0233868139,
+      "rpa_mdb": 0.8909964881,
+      "rtf_mdb": 0.0640528849,
+      "trained_on": "",
+      "score_datasets": "mir1k,mdb",
+      "score": 0.9256442654,
+      "score_all": 0.9256442654,
+      "rtf_max": 0.0640528849,
+      "rtf_mean": 0.0437198494,
+      "eligible": true
+    }
+  ],
+  "trackers_reported_on_both": 4,
+  "chosen_rpa_mdb": 0.941204199563138,
+  "speed_from": null,
+  "O2_tracker_pass": true
+}

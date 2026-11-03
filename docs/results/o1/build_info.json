@@ -8,7 +8,7 @@
     "world",
     "psola"
   ],
-  "tracker": "auto",
+  "tracker": "fcpe",
   "qc_tracker": "pyin",
   "qc_tol_cents": 10.0,
   "qc_min_coverage": 0.6,
@@ -23,8 +23,8 @@
       "reason": "file name says m9, folder says male8"
     }
   ],
-  "labels": 9262,
-  "seconds": 7968.5,
+  "labels": 17832,
+  "seconds": 2450.1,
   "versions": {
     "adaptitune": "0.1.0",
     "numpy": "2.4.6",
@@ -34,6 +34,6 @@
     "torch": "2.15.0",
     "onnxruntime": "1.31.1"
   },
-  "git_commit": "0db21b05dfc2ffae0266f59cf266e93e3d0c9e8f",
-  "created": "2026-11-03T12:22:40+0000"
+  "git_commit": "6dec60e57397048abe254cc84a65b233284989d1",
+  "created": "2026-11-03T15:35:15+0000"
 }

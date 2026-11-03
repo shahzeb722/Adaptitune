@@ -539,7 +539,8 @@ def _versions() -> dict:
     from importlib import metadata
 
     vs = {}
-    for p in ("adaptitune", "numpy", "librosa", "pyworld", "praat-parselmouth", "torch", "onnxruntime"):
+    for p in ("adaptitune", "numpy", "scipy", "librosa", "soundfile", "pyworld", "praat-parselmouth", "torch",
+              "onnxruntime", "torchfcpe", "pesto-pitch", "torchcrepe"):
         try:
             vs[p] = metadata.version(p)
         except Exception:
