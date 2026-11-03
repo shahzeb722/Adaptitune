@@ -38,6 +38,8 @@ def main():
     ap.add_argument("--mdb", required=True, help="MDB-stem-synth folder, or the .tar.gz (it is extracted next to it)")
     ap.add_argument("--out", default="results/laptop_speed")
     ap.add_argument("--threads", type=int, default=4)
+    ap.add_argument("--trackers", nargs="+", help="default: all six")
+    ap.add_argument("--limit", type=int, help="only for a quick check of the setup")
     a = ap.parse_args()
 
     mdb = Path(a.mdb)
@@ -54,7 +56,8 @@ def main():
     exe = [sys.executable, "-m", "adaptitune.cli"]
     out = Path(a.out)
     for ds, root, shard in (("mir1k", a.mir1k, "0/8"), ("mdb", str(mdb), "0/24")):
-        run(exe + ["bench-trackers", "--dataset", ds, "--root", root, "--shard", shard, "--threads", str(a.threads), "--out", str(out)])
+        extra = (["--trackers", *a.trackers] if a.trackers else []) + (["--limit", str(a.limit)] if a.limit else [])
+        run(exe + ["bench-trackers", "--dataset", ds, "--root", root, "--shard", shard, "--threads", str(a.threads), "--out", str(out)] + extra)
     zip_path = shutil.make_archive(str(out), "zip", root_dir=out)
     print(f"\nDone. Send this file back: {os.path.abspath(zip_path)}")
 
