@@ -34,9 +34,10 @@ class QualityConfig:
     min_voicing: float = 0.5
     # 95th percentile of WORLD copy-synthesis MCD over the voiced segments of 135 clean takes
     # (15 per singer) from the 9 training singers of the VocalSet corpus, with FCPE finding the
-    # segments (docs/results/o3/quality_calibration_fcpe.json; YIN gives 21.46). The units are
-    # those of metrics.mel_cepstral_distortion, which are not comparable with SPTK-based MCD.
-    mcd_threshold: float = 21.58
+    # segments and guiding WORLD's F0 (docs/results/o3/quality_calibration_fcpe.json; 21.58
+    # before WORLD took the tracker's F0 where its own jumps an octave). The units are those of
+    # metrics.mel_cepstral_distortion, which are not comparable with SPTK-based MCD.
+    mcd_threshold: float = 20.93
     force: str | None = None  # "world" | "psola" to bypass routing (benchmarks, detuning)
 
 
@@ -67,12 +68,45 @@ class ShiftResult:
 # --------------------------------------------------------------------------- WORLD
 
 
-def _world_analyze(x: np.ndarray, sr: int, frame_ms: float):
+# WORLD's own F0 (DIO + StoneMask) is replaced by the tracker's wherever they disagree by more
+# than this. Half an octave catches octave and fifth errors and leaves ordinary disagreement alone.
+F0_GROSS_CENTS = 600.0
+
+
+def _fix_world_f0(f0: np.ndarray, hint: np.ndarray, tol_cents: float = F0_GROSS_CENTS) -> np.ndarray:
+    """Frames where WORLD's F0 should be the tracker's: the tracker hears a pitch there and
+    WORLD hears none, or one more than ``tol_cents`` away. Both arrays in Hz on the same frames
+    (0 = unvoiced); the result is a boolean mask over ``f0``."""
+    n = min(len(f0), len(hint))
+    fix = np.zeros(len(f0), bool)
+    h, w = hint[:n], f0[:n]
+    voiced = h > 0
+    off = np.zeros(n, bool)
+    both = voiced & (w > 0)
+    off[both] = np.abs(1200 * np.log2(w[both] / h[both])) > tol_cents
+    fix[:n] = voiced & ((w <= 0) | off)
+    return fix
+
+
+def _world_analyze(x: np.ndarray, sr: int, frame_ms: float, f0_hint: np.ndarray | None = None):
+    """WORLD analysis. With ``f0_hint`` (the tracker's F0 in Hz on the same frames, 0 where it
+    hears no pitch), frames where DIO lost the pitch or jumped an octave take the tracker's
+    value, refined by StoneMask like the rest. WORLD resynthesizes at its own F0, so an octave
+    error there would come out as an octave error in the corrected audio."""
     import pyworld as pw
 
     x = np.ascontiguousarray(x, dtype=np.float64)
     f0, t = pw.dio(x, sr, f0_floor=60.0, f0_ceil=1100.0, frame_period=frame_ms)
     f0 = pw.stonemask(x, f0, t, sr)
+    if f0_hint is not None:
+        h = np.zeros(len(f0))
+        m = min(len(f0), len(f0_hint))
+        h[:m] = np.nan_to_num(np.asarray(f0_hint, dtype=np.float64)[:m])
+        fix = _fix_world_f0(f0, h)
+        if fix.any():
+            refined = pw.stonemask(x, np.where(fix, h, f0), t, sr)
+            refined = np.where(_fix_world_f0(refined, h), h, refined)  # if StoneMask strays again, keep the hint
+            f0 = np.where(fix, refined, f0)
     sp = pw.cheaptrick(x, f0, t, sr)
     ap = pw.d4c(x, f0, t, sr)
     return f0, t, sp, ap
@@ -192,7 +226,8 @@ def prepare(
     y = resample(x, sr, work_sr)
     voiced = ~np.isnan(midi)
     segs = [Segment(a, b, WORLD) for a, b in _runs(voiced)]
-    world = _world_analyze(y, work_sr, hop_s * 1000)
+    hint = np.where(voiced, 440.0 * 2.0 ** ((np.nan_to_num(midi) - 69) / 12), 0.0)
+    world = _world_analyze(y, work_sr, hop_s * 1000, hint)
     copy = world_copy(y, work_sr, hop_s, world)
     pad = int(0.02 * work_sr)
     for s in segs:

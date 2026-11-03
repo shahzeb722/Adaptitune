@@ -148,14 +148,16 @@ def summarize(df: pd.DataFrame) -> dict:
         "median_abs_err_lt50": float(low.abs_err.median()),
         "share_within_25_lt50": float((low.abs_err <= 25).mean()),
         "median_abs_err_ge50": float(high.abs_err.median()) if len(high) else float("nan"),
-        # the same notes in the clean take, as the measuring tracker hears them: what a perfect
-        # corrector would score (the singer's own deviation plus measurement error)
+        # the same notes in the clean take, as the measuring tracker hears them: the score of a
+        # corrector that exactly undoes the injected error (the singer's own distance from the
+        # target plus the disagreement between the analysis and measuring trackers)
         "median_abs_clean_err_lt50": float(low.clean_error_cents.abs().median()) if "clean_error_cents" in low else float("nan"),
         "share_within_25_ge50": float((high.abs_err <= 25).mean()) if len(high) else float("nan"),
         "vibrato_notes": len(has_vib),
         "vibrato_rate_within_10pct": float(rate_ok.mean()) if len(has_vib) else float("nan"),
         "vibrato_extent_ge_70pct": float(ext_ok.mean()) if len(has_vib) else float("nan"),
         "median_vibrato_extent_ratio": float((has_vib.vib_extent_out / has_vib.vib_extent_clean).median()) if len(has_vib) else float("nan"),
+        "median_vibrato_rate_dev": float(((has_vib.vib_rate_out - has_vib.vib_rate_clean).abs() / has_vib.vib_rate_clean).median()) if len(has_vib) else float("nan"),
         "mean_rtf": float(df.groupby(["take", "route"]).rtf.first().mean()),
     }
     if "corrector_world_share" in df:  # share of voiced audio the quality check kept on WORLD
@@ -168,9 +170,11 @@ def summarize(df: pd.DataFrame) -> dict:
         s["target_in_key_share"] = float(df.target_in_key.astype(bool).mean())
         s["median_abs_err_lt50_target_in_key"] = float(ink.abs_err.median()) if len(ink) else float("nan")
         s["share_within_25_lt50_target_in_key"] = float((ink.abs_err <= 25).mean()) if len(ink) else float("nan")
+    # the proposal's O3 criterion, read at the median note like the pitch error: error <= 25 cents
+    # on notes detuned by under 50 cents, vibrato rate within +-10% and extent >= 70% of the original
     s["O3_pass"] = bool(
         s["median_abs_err_lt50"] <= 25
-        and (np.isnan(s["vibrato_extent_ge_70pct"]) or s["median_vibrato_extent_ratio"] >= 0.7)
+        and (np.isnan(s["vibrato_extent_ge_70pct"]) or (s["median_vibrato_extent_ratio"] >= 0.7 and s["median_vibrato_rate_dev"] <= 0.10))
     )
     return s
 
@@ -184,8 +188,9 @@ def evaluate_keys(label_csv: str | Path, tracker: str = "auto", audio_root: str 
 
 def calibrate_mcd_threshold(clean_files: list[str | Path], percentile: float = 95, hop_s: float = 0.005, tracker: str = "auto") -> float:
     """95th percentile of WORLD copy-synthesis MCD over voiced segments of clean vocals
-    (proposal 5.3). Use the result as ``QualityConfig.mcd_threshold``. The voiced segments
-    come from ``tracker``, which should be the app's own, as in the app's quality check."""
+    (proposal 5.3). Use the result as ``QualityConfig.mcd_threshold``. ``tracker`` finds the
+    voiced segments and guides WORLD's F0, as in the app's quality check, so it should be the
+    app's own tracker."""
     from ..correction.planner import _runs
     from ..correction.shifter import _world_analyze, world_copy
     from ..pitch.trackers import get_tracker
@@ -195,7 +200,7 @@ def calibrate_mcd_threshold(clean_files: list[str | Path], percentile: float = 9
     for f in clean_files:
         a = load(f)
         tr = trk.track(a.samples, a.sr, hop_s)
-        wa = _world_analyze(a.samples, a.sr, hop_s * 1000)
+        wa = _world_analyze(a.samples, a.sr, hop_s * 1000, tr.f0)  # as the app's prepare() does
         copy = world_copy(a.samples, a.sr, hop_s, wa)
         for s, e in _runs(tr.f0 > 0):
             lo, hi = int(s * hop_s * a.sr), int(e * hop_s * a.sr)

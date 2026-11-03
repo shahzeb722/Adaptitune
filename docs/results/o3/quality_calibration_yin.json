@@ -1,5 +1,5 @@
 {
-  "mcd_threshold_db": 21.46,
+  "mcd_threshold_db": 21.85,
   "percentile": 95,
   "split": "train",
   "tracker": "yin",
@@ -142,5 +142,5 @@
     "clean/vocalset__male9__scales__vibrato__m9_scales_vibrato_a.wav",
     "clean/vocalset__male9__scales__straight__m9_scales_straight_o.wav"
   ],
-  "seconds": 409.4
+  "seconds": 320.5
 }
