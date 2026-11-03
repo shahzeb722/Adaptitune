@@ -127,3 +127,24 @@ def test_world_analysis_keeps_to_the_hint(detuned, truth_track):
     f0 = _world_analyze(y, SYNTH_SR, truth_track.hop_s * 1000, truth_track.f0)[0]
     v = truth_track.f0[:n] > 0
     assert np.median(np.abs(1200 * np.log2(f0[:n][v] / truth_track.f0[:n][v]))) < 10
+
+
+def test_world_refines_only_the_replaced_frames(detuned, truth_track):
+    """StoneMask refines each frame on its own, so redoing only the replaced frames gives exactly
+    the F0 that refining the whole seeded array gives."""
+    import pyworld as pw
+
+    from adaptitune.audio import SYNTH_SR, resample
+    from adaptitune.correction.shifter import _fix_world_f0, _world_analyze
+
+    y = np.ascontiguousarray(resample(detuned.samples, detuned.sr, SYNTH_SR), dtype=np.float64)
+    frame_ms = truth_track.hop_s * 1000
+    f0, t = _world_analyze(y, SYNTH_SR, frame_ms)[:2]  # WORLD's own F0, no hint
+    h = np.zeros(len(f0))
+    m = min(len(f0), len(truth_track.f0))
+    h[:m] = truth_track.f0[:m] * 2.0
+    fix = _fix_world_f0(f0, h)
+    assert fix.sum() > 100
+    whole = pw.stonemask(y, np.where(fix, h, f0), t, SYNTH_SR)
+    expected = np.where(fix, np.where(_fix_world_f0(whole, h), h, whole), f0)
+    np.testing.assert_array_equal(_world_analyze(y, SYNTH_SR, frame_ms, h)[0], expected)

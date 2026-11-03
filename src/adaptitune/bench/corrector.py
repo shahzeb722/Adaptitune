@@ -101,9 +101,12 @@ def evaluate(
     df.to_csv(out / "notes.csv", index=False)
     summ = summarize(df)
     pd.DataFrame([summ]).T.to_csv(out / "summary.csv", header=["value"])
+    from .trackers import _git_commit
+
     (out / "run.json").write_text(json.dumps(dict(
         corpus=str(corpus), tracker=c.tracker.name, measure_tracker=meas.name, settings=asdict(settings), split=split,
-        key_source=key_source, shard=list(shard) if shard else None, takes=int(df["take"].nunique()) if len(df) else 0,
+        key_source=key_source, quality=asdict(c.quality), shard=list(shard) if shard else None,
+        takes=int(df["take"].nunique()) if len(df) else 0, git_commit=_git_commit(),
     ), indent=2))
     return summ
 
@@ -112,7 +115,8 @@ def merge_shards(shard_dirs: list[str | Path], out_dir: str | Path) -> dict:
     """Join sharded ``evaluate`` runs: checks that the shards share their settings and cover
     0..n-1 once, then summarizes all notes together."""
     runs = [json.loads((Path(d) / "run.json").read_text()) for d in shard_dirs]
-    same = {k: {json.dumps(r[k], sort_keys=True) for r in runs} for k in ("corpus", "tracker", "measure_tracker", "settings", "split", "key_source")}
+    keys = ("corpus", "tracker", "measure_tracker", "settings", "split", "key_source", "quality")
+    same = {k: {json.dumps(r.get(k), sort_keys=True) for r in runs} for k in keys}
     bad = [k for k, v in same.items() if len(v) > 1]
     if bad:
         raise ValueError(f"shards differ in {bad}")
@@ -126,8 +130,10 @@ def merge_shards(shard_dirs: list[str | Path], out_dir: str | Path) -> dict:
     df.to_csv(out / "notes.csv", index=False)
     summ = summarize(df)
     pd.DataFrame([summ]).T.to_csv(out / "summary.csv", header=["value"])
-    meta = {k: runs[0][k] for k in same}
-    (out / "run.json").write_text(json.dumps(dict(meta, merged_from=[str(d) for d in shard_dirs], takes=int(df["take"].nunique())), indent=2))
+    meta = {k: runs[0].get(k) for k in same}
+    commits = sorted({str(r.get("git_commit")) for r in runs})
+    (out / "run.json").write_text(json.dumps(dict(meta, merged_from=[str(d) for d in shard_dirs], takes=int(df["take"].nunique()),
+                                                  git_commit=commits[0] if len(commits) == 1 else commits), indent=2))
     return summ
 
 

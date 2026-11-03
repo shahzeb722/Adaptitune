@@ -103,10 +103,11 @@ def _world_analyze(x: np.ndarray, sr: int, frame_ms: float, f0_hint: np.ndarray 
         m = min(len(f0), len(f0_hint))
         h[:m] = np.nan_to_num(np.asarray(f0_hint, dtype=np.float64)[:m])
         fix = _fix_world_f0(f0, h)
-        if fix.any():
-            refined = pw.stonemask(x, np.where(fix, h, f0), t, sr)
-            refined = np.where(_fix_world_f0(refined, h), h, refined)  # if StoneMask strays again, keep the hint
-            f0 = np.where(fix, refined, f0)
+        if fix.any():  # StoneMask refines each frame on its own, so only the replaced ones are redone
+            seed, h_fix = np.ascontiguousarray(h[fix]), h[fix]
+            refined = pw.stonemask(x, seed, np.ascontiguousarray(t[fix]), sr)
+            f0 = f0.copy()
+            f0[fix] = np.where(_fix_world_f0(refined, h_fix), h_fix, refined)  # if StoneMask strays again, keep the hint
     sp = pw.cheaptrick(x, f0, t, sr)
     ap = pw.d4c(x, f0, t, sr)
     return f0, t, sp, ap

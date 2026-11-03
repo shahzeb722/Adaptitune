@@ -23,7 +23,7 @@ AdaptiTune corrects a recorded vocal the way classic auto-tune does: it detects 
 ```bash
 python3.11 -m venv .venv && source .venv/bin/activate      # Windows: .venv\Scripts\activate
 pip install -e ".[app,dev,study]"
-pytest                                                     # about 110 tests, 2-4 minutes
+pytest                                                     # about 115 tests, 2-4 minutes
 adaptitune-app                                             # the desktop app
 adaptitune correct my_take.wav fixed.wav --key "A minor"   # one file from the command line
 ```
