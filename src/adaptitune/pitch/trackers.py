@@ -424,10 +424,18 @@ def find_onnx_model() -> str | None:
     return None
 
 
+# The tracker the O2 benchmark chose with the rule fixed in advance (docs/O2_PROTOCOL.md A6):
+# FCPE, RPA 0.988 on MIR-1K and 0.941 on MDB-stem-synth (docs/RESULTS.md). "auto" means this one.
+APP_TRACKER = "fcpe"
+
+
 def get_tracker(name: str = "auto", **kw) -> Tracker:
-    """'auto' prefers an exported ONNX tracker (the deployment path), then PESTO or FCPE if
-    PyTorch is installed, then pYIN."""
+    """'auto' is the tracker O2 chose (``APP_TRACKER``). If its package is not installed, it
+    falls back to an exported ONNX tracker, then PESTO or FCPE if PyTorch is installed, then
+    pYIN."""
     if name == "auto":
+        if REGISTRY[APP_TRACKER].available():
+            return REGISTRY[APP_TRACKER](**kw)
         onnx = find_onnx_model()
         if onnx:
             try:

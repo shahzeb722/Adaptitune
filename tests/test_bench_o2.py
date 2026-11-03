@@ -243,3 +243,12 @@ def test_shards_merge_to_the_unsharded_result(tmp_path):
         assert merged[col].iloc[0] == pytest.approx(full[col].iloc[0])
     with pytest.raises(ValueError):  # a missing shard is an error, not a smaller benchmark
         B.merge_shards([tmp_path / "s0"], tmp_path / "m2", "synthetic")
+
+
+def test_auto_is_the_tracker_o2_chose():
+    """The app's default tracker is the one the O2 selection rule chose."""
+    from adaptitune.pitch.trackers import APP_TRACKER, REGISTRY, get_tracker
+
+    if not REGISTRY[APP_TRACKER].available():
+        pytest.skip(f"{APP_TRACKER} is not installed")
+    assert get_tracker("auto").name == APP_TRACKER == "fcpe"
