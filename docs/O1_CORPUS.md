@@ -101,9 +101,32 @@ The per-frame curve in the `.npz` file is the ground truth. `offset_cents` and t
 * **Professional source singing.** VocalSet singers are trained, so the clean takes are cleaner than an amateur's best take. Notes more than 20 cents from a semitone are never labelled.
 * **Pitch-class targets come from the clean note,** not from a score. A professional who sings a different note than the composer wrote is still "in tune" here.
 
-## 8. Synthetic build (code check only)
+## 8. The VocalSet build (the O1 result)
 
-The numbers below are from synthetic singers. They show that the code works, not that O1 is met. O1 needs the VocalSet build.
+**O1 is met.** The test split holds **2.20 h of unique clean audio from 9 singers** (5 female, 4 male) who appear in no other split. Every label used for evaluation passed the recovery check at build time, and a second, independent tracker recovers **99.7%** of them within 10 cents.
+
+Built on 3 November 2026 from the team's VocalSet copy (sample hashes in `data/manifests/vocalset_pcm.md5`) with the commands in section 1 and `--workers 2`, in 2.2 h on a shared 4-core cloud VM. Rebuilding takes with the code of the commit recorded in `build_info.json` gives byte-identical audio and labels (checked on two takes).
+
+| Check | Result |
+|---|---|
+| Takes | 1,512 takes: 677 test, 683 train, 152 validation. 4.81 h of unique clean audio, each take with a WORLD and a PSOLA copy. |
+| Split by singer | Test: female1, 2, 4, 7, 8 and male2, 3, 4, 11 (**2.20 h**). Train: female3, 5, 6 and male1, 5, 7, 8, 9, 10 (2.13 h). Validation: female9 and male6 (0.48 h). No singer is in two splits (`O1_singers_disjoint`), and `O1_test_hours_ok` is true. |
+| Material | Scales 1.95 h, arpeggios 1.40 h, song excerpts 0.80 h, long tones 0.67 h. By technique: straight 1.19 h, slow piano 1.16 h, slow forte 1.09 h, vibrato 0.98 h, messa di voce 0.39 h. |
+| Labelled notes | 4,631 notes (23% of all notes; the rest are shorter than 120 ms or more than 20 cents from a semitone), so 9,262 labels with both shifters. 2,111 notes are in the test split. |
+| Injected errors | Offsets 10–99.9 cents (median 54.3), 49.5% sharp; drift on 36% of notes, scoops on 34%, vibrato changed on 30%; 55% are in the highly detuned set. |
+| QC gate (pYIN) | **90.7% of labels kept** (PSOLA 92.9%, WORLD 88.5%). The 865 rejected labels are 358 `low_coverage`, 325 `offset_mismatch` and 182 `octave_error`. In the test split, 3,915 labels are kept (PSOLA 94.9%, WORLD 90.6%). |
+| Independent re-measurement (FCPE) | **99.67% of the 8,397 kept labels recovered within 10 cents** (PSOLA 99.84%, WORLD 99.49%). The median residual is 0.84 cents and the 95th percentile 3.65 cents. Of the 28 misses, 18 are octave errors (a residual of about 1,200 cents: FCPE measured the note an octave off) and 10 are offset mismatches. `docs/results/o1/verify_fcpe.json` lists every one. |
+| Integrity | All 6,050 files match `checksums.sha256` |
+
+`docs/results/o1/` holds the build record, the split, `corpus-stats` and the FCPE check.
+
+**Anomalies in the source.** One file is left out: `FULL/male8/excerpts/vibrato/m9_caro_vibrato.wav` is named for male9 but filed under male8, so who sang it is unclear (`build_info.json`, `source_files_skipped`). Six takes sit in a folder spelt `vibrado` and are counted as vibrato.
+
+**The stored key.** The manifest's `key` is the key estimator's answer on the clean take. For exercises with few pitch classes it is often not the key a singer would name: an arpeggio's three notes fit several keys, and a scale fits its relative minor as well as its major (46% of takes got a minor key). What matters for in-key correction is whether the key holds the note's target. It does for 96.6% of kept labels (96.4% in the test split), and 89.7% of takes have every kept target inside it. `eval-corrector` reports the notes whose target is outside the key separately (`target_in_key`).
+
+## 9. Synthetic build (code check only)
+
+The numbers below are from synthetic singers. They show that the code works, not that O1 is met. Section 8 has the VocalSet build.
 
 Built with `adaptitune build-corpus --source synthetic --singers 24 --takes 6 --workers 2` in 5 minutes on a 4-core cloud VM:
 

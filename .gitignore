@@ -7,7 +7,7 @@ build/
 dist/
 data/raw/
 data/corpus/
-results/
+/results/
 *.wav
 !tests/fixtures/*.wav
 *.onnx

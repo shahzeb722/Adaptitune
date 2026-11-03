@@ -1,0 +1,39 @@
+{
+  "schema": 2,
+  "source": "vocalset",
+  "root": "data/raw/VocalSet",
+  "seed": 0,
+  "sr": 24000,
+  "routes": [
+    "world",
+    "psola"
+  ],
+  "tracker": "auto",
+  "qc_tracker": "pyin",
+  "qc_tol_cents": 10.0,
+  "qc_min_coverage": 0.6,
+  "keep_within_cents": 20,
+  "high_detune_cents": 50,
+  "min_label_note_s": 0.12,
+  "takes": 1512,
+  "failed_takes": {},
+  "source_files_skipped": [
+    {
+      "path": "data/raw/VocalSet/FULL/male8/excerpts/vibrato/m9_caro_vibrato.wav",
+      "reason": "file name says m9, folder says male8"
+    }
+  ],
+  "labels": 9262,
+  "seconds": 7968.5,
+  "versions": {
+    "adaptitune": "0.1.0",
+    "numpy": "2.4.6",
+    "librosa": "0.11.0",
+    "pyworld": "0.3.5",
+    "praat-parselmouth": "0.4.7",
+    "torch": "2.15.0",
+    "onnxruntime": "1.31.1"
+  },
+  "git_commit": "0db21b05dfc2ffae0266f59cf266e93e3d0c9e8f",
+  "created": "2026-11-03T12:22:40+0000"
+}

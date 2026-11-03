@@ -1,0 +1,250 @@
+{
+ "tracker": "fcpe",
+ "independent_of_build_qc": true,
+ "labels_total": 9262,
+ "labels_failed_build_qc": 865,
+ "build_qc_pass_share": 0.9066076441373353,
+ "notes_checked": 8397,
+ "recovered_share": 0.9966654757651542,
+ "median_abs_residual_cents": 0.84,
+ "p95_abs_residual_cents": 3.65,
+ "by_route": {
+  "psola": {
+   "recovered_share": 0.9983720930232558,
+   "median_abs_residual_cents": 0.97
+  },
+  "world": {
+   "recovered_share": 0.9948742982670247,
+   "median_abs_residual_cents": 0.75
+  }
+ },
+ "failures": [
+  {
+   "take": "vocalset__female1__scales__slow_piano__f1_scales_f_slow_piano_e",
+   "index": 9,
+   "route": "psola",
+   "residual": -10.6,
+   "coverage": 1.0,
+   "reason": "offset_mismatch"
+  },
+  {
+   "take": "vocalset__female2__scales__slow_forte__f2_scales_f_slow_forte_u",
+   "index": 15,
+   "route": "psola",
+   "residual": -1200.37,
+   "coverage": 1.0,
+   "reason": "octave_error"
+  },
+  {
+   "take": "vocalset__female2__scales__vibrato__f2_scales_vibrato_u",
+   "index": 23,
+   "route": "psola",
+   "residual": 12.66,
+   "coverage": 1.0,
+   "reason": "offset_mismatch"
+  },
+  {
+   "take": "vocalset__female2__scales__vibrato__f2_scales_vibrato_u",
+   "index": 23,
+   "route": "world",
+   "residual": 18.49,
+   "coverage": 1.0,
+   "reason": "offset_mismatch"
+  },
+  {
+   "take": "vocalset__female3__scales__slow_piano__f3_scales_c_slow_piano_a",
+   "index": 6,
+   "route": "psola",
+   "residual": 13.01,
+   "coverage": 1.0,
+   "reason": "offset_mismatch"
+  },
+  {
+   "take": "vocalset__female3__scales__vibrato__f3_scales_vibrato_a",
+   "index": 7,
+   "route": "psola",
+   "residual": 15.91,
+   "coverage": 1.0,
+   "reason": "offset_mismatch"
+  },
+  {
+   "take": "vocalset__female4__arpeggios__slow_forte__f4_arpeggios_f_slow_forte_a",
+   "index": 5,
+   "route": "psola",
+   "residual": -14.26,
+   "coverage": 1.0,
+   "reason": "offset_mismatch"
+  },
+  {
+   "take": "vocalset__female4__excerpts__vibrato__f4_caro_vibrato",
+   "index": 8,
+   "route": "world",
+   "residual": 11.85,
+   "coverage": 1.0,
+   "reason": "offset_mismatch"
+  },
+  {
+   "take": "vocalset__female9__scales__slow_forte__f9_scales_f_slow_forte_i",
+   "index": 13,
+   "route": "psola",
+   "residual": -13.97,
+   "coverage": 1.0,
+   "reason": "offset_mismatch"
+  },
+  {
+   "take": "vocalset__male10__arpeggios__slow_forte__m10_arpeggios_f_slow_forte_u",
+   "index": 27,
+   "route": "world",
+   "residual": 1196.94,
+   "coverage": 1.0,
+   "reason": "octave_error"
+  },
+  {
+   "take": "vocalset__male10__scales__slow_forte__m10_scales_c_slow_forte_e",
+   "index": 8,
+   "route": "world",
+   "residual": 1200.91,
+   "coverage": 1.0,
+   "reason": "octave_error"
+  },
+  {
+   "take": "vocalset__male10__scales__slow_forte__m10_scales_c_slow_forte_o",
+   "index": 26,
+   "route": "world",
+   "residual": 1195.27,
+   "coverage": 1.0,
+   "reason": "octave_error"
+  },
+  {
+   "take": "vocalset__male10__scales__slow_forte__m10_scales_f_slow_forte_o",
+   "index": 37,
+   "route": "world",
+   "residual": 1187.58,
+   "coverage": 1.0,
+   "reason": "octave_error"
+  },
+  {
+   "take": "vocalset__male10__scales__slow_forte__m10_scales_f_slow_forte_u",
+   "index": 36,
+   "route": "world",
+   "residual": 1203.6,
+   "coverage": 1.0,
+   "reason": "octave_error"
+  },
+  {
+   "take": "vocalset__male10__scales__vibrato__m10_scales_vibrato_u",
+   "index": 31,
+   "route": "world",
+   "residual": 1300.01,
+   "coverage": 1.0,
+   "reason": "octave_error"
+  },
+  {
+   "take": "vocalset__male2__arpeggios__straight__m2_arpeggios_straight_i",
+   "index": 1,
+   "route": "world",
+   "residual": 1189.64,
+   "coverage": 1.0,
+   "reason": "octave_error"
+  },
+  {
+   "take": "vocalset__male3__scales__slow_piano__m3_scales_c_slow_piano_o",
+   "index": 14,
+   "route": "world",
+   "residual": 1191.41,
+   "coverage": 1.0,
+   "reason": "octave_error"
+  },
+  {
+   "take": "vocalset__male4__arpeggios__slow_forte__m4_arpeggios_f_slow_forte_u",
+   "index": 21,
+   "route": "world",
+   "residual": 1199.12,
+   "coverage": 1.0,
+   "reason": "octave_error"
+  },
+  {
+   "take": "vocalset__male4__arpeggios__straight__m4_arpeggios_straight_u",
+   "index": 3,
+   "route": "world",
+   "residual": 1202.0,
+   "coverage": 1.0,
+   "reason": "octave_error"
+  },
+  {
+   "take": "vocalset__male4__arpeggios__straight__m4_arpeggios_straight_u",
+   "index": 8,
+   "route": "world",
+   "residual": 1207.6,
+   "coverage": 1.0,
+   "reason": "octave_error"
+  },
+  {
+   "take": "vocalset__male6__arpeggios__vibrato__m6_arpeggios_vibrato_e",
+   "index": 3,
+   "route": "world",
+   "residual": -14.29,
+   "coverage": 1.0,
+   "reason": "offset_mismatch"
+  },
+  {
+   "take": "vocalset__male7__long_tones__messa__m7_long_messa_e",
+   "index": 9,
+   "route": "world",
+   "residual": 1193.58,
+   "coverage": 1.0,
+   "reason": "octave_error"
+  },
+  {
+   "take": "vocalset__male7__long_tones__messa__m7_long_messa_o",
+   "index": 9,
+   "route": "world",
+   "residual": 1195.63,
+   "coverage": 1.0,
+   "reason": "octave_error"
+  },
+  {
+   "take": "vocalset__male7__long_tones__straight__m7_long_straight_e",
+   "index": 9,
+   "route": "world",
+   "residual": 1198.08,
+   "coverage": 1.0,
+   "reason": "octave_error"
+  },
+  {
+   "take": "vocalset__male7__long_tones__straight__m7_long_straight_o",
+   "index": 13,
+   "route": "world",
+   "residual": 1190.92,
+   "coverage": 1.0,
+   "reason": "octave_error"
+  },
+  {
+   "take": "vocalset__male7__scales__slow_forte__m7_scales_f_slow_forte_a",
+   "index": 12,
+   "route": "world",
+   "residual": 1198.0,
+   "coverage": 1.0,
+   "reason": "octave_error"
+  },
+  {
+   "take": "vocalset__male7__scales__slow_forte__m7_scales_f_slow_forte_e",
+   "index": 11,
+   "route": "world",
+   "residual": 1198.44,
+   "coverage": 1.0,
+   "reason": "octave_error"
+  },
+  {
+   "take": "vocalset__male7__scales__slow_forte__m7_scales_f_slow_forte_o",
+   "index": 10,
+   "route": "world",
+   "residual": 23.58,
+   "coverage": 1.0,
+   "reason": "offset_mismatch"
+  }
+ ],
+ "tolerance_cents": 10.0,
+ "files_checked": 6050,
+ "files_bad": []
+}
