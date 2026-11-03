@@ -75,6 +75,7 @@ def evaluate(
         mc = clean_cache[take]
         an = c.analyze(det, key=keys[take] if key_source == "user" else None)
         res = c.correct(an, settings, score=False)
+        snap_pcs = set(an.key.snap_classes) if an.key else set(range(12))
         out_tr = meas.track(res.audio.samples, res.audio.sr, hop)
         mo = M.contour_midi(out_tr.f0)
         for _, r in g.iterrows():
@@ -89,7 +90,7 @@ def evaluate(
                     error_cents=100 * (ctr - r.target_midi) if not np.isnan(ctr) else np.nan,
                     vib_rate_clean=r0, vib_rate_out=r1, vib_extent_clean=e0, vib_extent_out=e1,
                     key_used=an.key.name if an.key else "", key_true=keys[take], rtf=res.rtf,
-                    technique=tech.get(take, ""),
+                    technique=tech.get(take, ""), target_in_key=int(r.target_midi) % 12 in snap_pcs,
                 )
             )
     df = pd.DataFrame(rows)
@@ -152,6 +153,12 @@ def summarize(df: pd.DataFrame) -> dict:
     }
     for route, g in low.groupby("route"):
         s[f"median_abs_err_lt50_{route}"] = float(g.abs_err.median())
+    if "target_in_key" in df:
+        # a take that changes key has notes outside any one key; in-key snapping cannot reach them
+        ink = low[low.target_in_key.astype(bool)]
+        s["target_in_key_share"] = float(df.target_in_key.astype(bool).mean())
+        s["median_abs_err_lt50_target_in_key"] = float(ink.abs_err.median()) if len(ink) else float("nan")
+        s["share_within_25_lt50_target_in_key"] = float((ink.abs_err <= 25).mean()) if len(ink) else float("nan")
     s["O3_pass"] = bool(
         s["median_abs_err_lt50"] <= 25
         and (np.isnan(s["vibrato_extent_ge_70pct"]) or s["median_vibrato_extent_ratio"] >= 0.7)
