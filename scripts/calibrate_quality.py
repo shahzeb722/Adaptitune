@@ -3,7 +3,7 @@
 The threshold is the 95th percentile of WORLD copy-synthesis MCD over voiced segments of clean
 takes. It must come from TRAINING singers only, never from the test singers that O3 is scored on.
 
-    python scripts/calibrate_quality.py data/corpus --takes-per-singer 15 --out results/quality_calibration.json
+    python scripts/calibrate_quality.py data/corpus --tracker <the O2 choice> --takes-per-singer 15 --out results/quality_calibration.json
 
 Then set ``QualityConfig.mcd_threshold`` in src/adaptitune/correction/shifter.py to the value.
 """
@@ -26,6 +26,7 @@ def main():
     ap.add_argument("--takes-per-singer", type=int, default=15)
     ap.add_argument("--percentile", type=float, default=95)
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--tracker", default="auto", help="the app's tracker (it finds the voiced segments)")
     ap.add_argument("--out", default="results/quality_calibration.json")
     a = ap.parse_args()
     corpus = Path(a.corpus)
@@ -39,8 +40,8 @@ def main():
         idx = rng.permutation(len(g))[: a.takes_per_singer]
         picked += [corpus / c for c in g.iloc[idx]["clean"]]
     t0 = time.time()
-    thr = calibrate_mcd_threshold(picked, a.percentile)
-    res = dict(mcd_threshold_db=round(thr, 2), percentile=a.percentile, split=a.split, singers=int(man.singer.nunique()),
+    thr = calibrate_mcd_threshold(picked, a.percentile, tracker=a.tracker)
+    res = dict(mcd_threshold_db=round(thr, 2), percentile=a.percentile, split=a.split, tracker=a.tracker, singers=int(man.singer.nunique()),
                takes=len(picked), files=[str(p.relative_to(corpus)) for p in picked], seconds=round(time.time() - t0, 1))
     Path(a.out).parent.mkdir(parents=True, exist_ok=True)
     Path(a.out).write_text(json.dumps(res, indent=2))

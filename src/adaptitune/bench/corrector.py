@@ -177,14 +177,15 @@ def evaluate_keys(label_csv: str | Path, tracker: str = "auto", audio_root: str 
     return evaluate_key_labels(label_csv, tracker, audio_root)
 
 
-def calibrate_mcd_threshold(clean_files: list[str | Path], percentile: float = 95, hop_s: float = 0.005) -> float:
+def calibrate_mcd_threshold(clean_files: list[str | Path], percentile: float = 95, hop_s: float = 0.005, tracker: str = "auto") -> float:
     """95th percentile of WORLD copy-synthesis MCD over voiced segments of clean vocals
-    (proposal 5.3). Use the result as ``QualityConfig.mcd_threshold``."""
+    (proposal 5.3). Use the result as ``QualityConfig.mcd_threshold``. The voiced segments
+    come from ``tracker``, which should be the app's own, as in the app's quality check."""
     from ..correction.planner import _runs
     from ..correction.shifter import _world_analyze, world_copy
     from ..pitch.trackers import get_tracker
 
-    trk = get_tracker("auto")
+    trk = get_tracker(tracker)
     vals = []
     for f in clean_files:
         a = load(f)

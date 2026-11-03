@@ -140,6 +140,7 @@ def main(argv=None):
 
     cal = sub.add_parser("calibrate", help="95th-percentile WORLD copy-synthesis MCD on clean vocals")
     cal.add_argument("files", nargs="+")
+    cal.add_argument("--tracker", default="auto", help="the app's tracker (it finds the voiced segments)")
 
     s = sub.add_parser("simulate")
     s.add_argument("--singers", type=int, default=100)
@@ -243,7 +244,7 @@ def main(argv=None):
     elif a.cmd == "calibrate":
         from .bench.corrector import calibrate_mcd_threshold
 
-        print(f"mcd_threshold = {calibrate_mcd_threshold(a.files):.2f} dB")
+        print(f"mcd_threshold = {calibrate_mcd_threshold(a.files, tracker=a.tracker):.2f} dB")
     elif a.cmd == "simulate":
         from .agent.experiment import run, train_population
 
