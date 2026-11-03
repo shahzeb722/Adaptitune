@@ -1,41 +1,55 @@
-# Results so far (synthetic data only)
+# Results
 
-Every number here comes from **synthetic singing**, because the public datasets could not be downloaded in the build environment. The key results use real melodies (the Essen folksong collection), but these are rendered as synthetic singing too. Treat these results as a check that the code works end to end, not as findings for the report. Run `scripts/reproduce_results.sh`, then repeat it with `--source vocalset`, `--dataset mir1k` and `--dataset mdb` once the data is on disk.
+Status on 3 November 2026. O1, O2's tracker benchmark and O3 now run on the real datasets. O2's key result still uses real melodies rendered as synthetic singing, because the hand-labelled excerpts are not back yet. O4 and O6 are simulations by design, and O5's speed has to be measured on the reference laptop. The earlier synthetic-only results are kept in the appendix as code checks.
 
-Machine: 4-core Intel Xeon @ 2.8 GHz cloud VM, CPU only. This is a different machine from the reference laptop, so re-measure speed there.
+| Objective | Status | Main number |
+|---|---|---|
+| O1 evaluation corpus | **Met** (VocalSet) | 2.20 h of unique test audio from 9 singers not used in development; 99.5% of kept offsets recovered within 10 cents by a second tracker |
+| O2 pitch trackers | **Met** (MIR-1K, MDB-stem-synth); the laptop speeds still have to confirm the choice | 4 trackers on both sets; the rule chooses FCPE, with RPA 0.941 on MDB-stem-synth (target 0.90) |
+| O2 key estimation | Waiting for the hand labels | 73.8% exact on amateur-like Essen excerpts (target 75% on the hand-labelled set) |
+| O3 correction | **Met** (VocalSet test singers) | Median error 7.7 cents on notes detuned by under 50 cents (target 25); the median vibrato note keeps its rate within 2% and 97% of its extent |
+| O4 personalization | **Met** in simulation | Thompson sampling reaches 91.4% of the oracle's reward after 20 interactions |
+| O5 offline app | Laptop run pending | The full correction path runs at 0.22× real time on real singing on the cloud VM (target 0.5 on the laptop) |
+| O6 user study | Design ready | Power simulation below |
 
-## O1: detuned corpus (144 synthetic takes)
+**Machine.** The real-data runs used a shared 4-core Intel Xeon @ 2.8 GHz cloud VM, CPU only, with several jobs running side by side at 1 thread each. Accuracy does not depend on that, but speed does, so the speed numbers below are not the reference laptop's. `scripts/o2_laptop_speed.py` measures them there.
 
-Full datasheet: [O1_CORPUS.md](O1_CORPUS.md).
+## O1: evaluation corpus (VocalSet)
+
+**O1 is met.** Full datasheet: [O1_CORPUS.md](O1_CORPUS.md), section 8. Records: `docs/results/o1/`.
 
 | | Value |
 |---|---|
-| Takes / singers | 144 takes from 24 synthetic singers, split by singer (17 train, 4 val, 3 test) |
-| Labelled notes | 1,230, each detuned the same way with WORLD and with PSOLA (2,460 labels). 54% are detuned by more than 50 cents and kept as a separate set. |
-| QC gate (pYIN re-measures every note) | **98.8%** of labels kept (PSOLA 99.9%, WORLD 97.6%), median residual 0.31 cents |
-| Independent re-measurement with FCPE | **99.96%** of kept labels recovered within 10 cents, median residual 0.69 cents, all 578 files match their checksums |
-| Unique test audio | 0.04 h. **The O1 target is 2 h, so this must come from VocalSet** (the split planner reserves 2 h of test singers automatically). |
+| Unique clean audio | 4.81 h in 1,512 takes from all 20 VocalSet singers. Test **2.20 h** (female1, 2, 4, 7, 8 and male2, 3, 4, 11), train 2.13 h, validation 0.48 h. No singer is in two splits. |
+| Labelled notes | 8,916 notes, each detuned the same way with WORLD and with PSOLA (17,832 labels). Offsets 10–100 cents (median 54.5), plus drift, scoops and changed vibrato. 55% are detuned by more than 50 cents and kept as a separate set. |
+| QC gate (pYIN) | **89.8%** of labels kept (PSOLA 91.2%, WORLD 88.4%). The test split keeps 7,624 labels. |
+| Second measurement (FCPE) | **99.48%** of the 16,011 kept labels recovered within 10 cents, median residual 0.75 cents. All 6,050 files match their checksums. |
+| Targets | Each note's target is the semitone nearest the singer's own note centre, as FCPE measures it, and only notes within 20 cents of a semitone are labelled. pYIN puts 20.6% of the kept notes more than 20 cents from their target: the two trackers disagree by a median of 3.8 cents on a note centre, most on vibrato. O3 reports this as its clean floor. |
 
-## O2: tracker benchmark (40 noisy synthetic takes, SNR 0–20 dB)
+The corpus was built twice. The first build used PESTO's ONNX export as the analysis tracker, and the O2 benchmark then showed that PESTO reports steady pitch in thirds of a semitone, so the rebuild uses FCPE, the tracker O2 chose. Section 8 of the datasheet has the comparison.
 
-Method, fixed before any real-data run: [O2_PROTOCOL.md](O2_PROTOCOL.md). Every tracker that takes a range searches C1–B6, threads are pinned to 4, and each tracker runs in its own process after a warm-up call.
+## O2: pitch-tracker benchmark (MIR-1K and MDB-stem-synth)
 
-| Tracker | RPA (95% CI) | RPA within 10 cents | RCA | Overall accuracy | Voicing recall | Voicing false alarm | Octave errors | RTF (4 threads) | Peak MB |
-|---|---|---|---|---|---|---|---|---|---|
-| FCPE | **0.986** (0.968–0.998) | 0.935 | 0.990 | 0.887 | 0.996 | 0.476 | 0.005 | 0.027 | 823 |
-| PESTO (PyTorch) | 0.963 (0.937–0.983) | 0.684 | 0.978 | 0.900 | 0.933 | 0.143 | 0.016 | 0.151 | 1067 |
-| PESTO (ONNX export, what the app ships) | 0.956 (0.928–0.979) | 0.720 | 0.969 | 0.896 | 0.932 | 0.144 | 0.012 | 0.037 | 725 |
-| CREPE (tiny) | 0.913 (0.850–0.967) | 0.525 | 0.923 | 0.897 | 0.894 | 0.098 | 0.011 | 0.265 | 993 |
-| YIN | 0.889 (0.857–0.921) | 0.684 | 0.943 | 0.774 | 0.981 | 0.653 | 0.054 | 0.022 | 724 |
-| pYIN | 0.855 (0.803–0.903) | 0.667 | 0.861 | 0.836 | 0.841 | 0.189 | 0.006 | 0.136 | 721 |
+Method, fixed before any real-data run: [O2_PROTOCOL.md](O2_PROTOCOL.md). MIR-1K: the vocal channel of all 1,000 clips (19 singers). MDB-stem-synth: all 230 stems (85 tracks). Confidence intervals are cluster bootstraps over singers or tracks. Records: `docs/results/o2/`.
 
-* **FCPE is the most accurate and among the fastest.** It is ahead of PyTorch PESTO by 2.3 RPA points (paired 95% CI 0.0 to 5.1), and it is much more precise: 93.5% of frames within 10 cents against about 70% for PESTO. Its weak spot is voicing: it calls 48% of unvoiced frames voiced.
-* **The ONNX export of PESTO runs 4× faster than PyTorch PESTO** (RTF 0.037 against 0.151) at the same accuracy. The difference is within the confidence intervals; the export uses a 10 ms step and PyTorch a 5 ms one.
-* **CREPE tiny is over the 0.25 RTF budget** on this machine, and its released weights were trained on both MIR-1K and MDB-stem-synth, so the selection rule cannot choose it.
-* On these synthetic takes the pre-registered rule would choose FCPE. **The real choice is made on MIR-1K and MDB-stem-synth.**
-* **Timing check:** shifting each tracker's output by −30 to +30 ms, the pitch accuracy of every tracker peaks at 0 ms, so frame times are aligned.
+| Tracker | Score under the rule | MIR-1K RPA (95% CI) | MDB-stem-synth RPA (95% CI) | Within 10 cents, MIR-1K / MDB | Median error in cents, MIR-1K / MDB | RTF (cloud, 1 thread), MIR-1K / MDB |
+|---|---|---|---|---|---|---|
+| **FCPE (chosen)** | **0.965** | **0.988** (0.985–0.991) | **0.941** (0.928–0.953) | 0.695 / 0.857 | 6.6 / 1.6 | 0.050 / 0.086 |
+| pYIN | 0.929, not eligible (RTF over 0.25) | 0.966 (0.959–0.972) | 0.893 (0.865–0.917) | 0.629 / 0.708 | 7.3 / 4.0 | 0.41 / 0.31 |
+| YIN | 0.926 | 0.960 (0.952–0.968) | 0.891 (0.866–0.912) | 0.627 / 0.705 | 7.2 / 3.9 | 0.023 / 0.064 |
+| PESTO, ONNX export | 0.882 (MDB only) | 0.983 (0.978–0.987), trained on this set | 0.882 (0.854–0.907) | 0.462 / 0.540 | 10.2 / 7.8 | 0.17 / 0.16 |
 
-## O2: key estimation (Essen folksong collection, held-out volumes)
+* **O2's tracker criteria are met.** Four trackers are reported on both datasets, and FCPE, the tracker the pre-registered rule chooses, reaches an RPA of 0.941 on MDB-stem-synth against the 0.90 target. The rule would choose FCPE even if training overlap were ignored.
+* **FCPE wins clearly.** Against the runner-up, YIN, the paired difference is +2.8 RPA points on MIR-1K (95% CI 2.3 to 3.4) and +5.0 on MDB-stem-synth (3.5 to 6.8). It is also the most precise: 86% of MDB-stem-synth frames within 10 cents, where the next best gets 71%.
+* **PESTO reports steady pitch in thirds of a semitone,** in PyTorch and in the ONNX export alike, so its accuracy within 10 cents is the lowest of the four. Its 50-cent RPA on MIR-1K is high, but PESTO was trained on MIR-1K audio, so the rule scores it on MDB-stem-synth only. There it also calls 60% of voiced frames unvoiced (voicing recall 0.405), which costs overall accuracy, not RPA.
+* **The reference timing checks out.** With each tracker's output shifted from −30 to +30 ms, every tracker's RPA peaks at 0 ms on both datasets. PESTO's within-10-cent accuracy peaks at +5 ms on MIR-1K, half of its 10 ms step.
+* **PyTorch PESTO and CREPE are still running** (about 12 hours on this VM) and will be added to the table. CREPE was trained on both sets, so the rule reports it but cannot choose it. PyTorch PESTO has the same weights as the export, which scored 0.882 on MDB-stem-synth; it would need 0.955 there to come within the 1-point tie margin of FCPE's score.
+* **These speeds are not the official ones.** Here every job ran at 1 thread with up to four jobs sharing the VM. FCPE's slowest RTF, 0.086, is a third of the 0.25 limit. The laptop run gives the numbers for the report, and `adaptitune choose-tracker --speed` applies the rule again with them.
+* **The app runs FCPE through ONNX Runtime,** with no PyTorch. `scripts/export_onnx.py --model fcpe` makes the export, and on a test clip it matches the PyTorch model within 0.5 cents on every voiced frame, with the same voicing decisions (`tests/test_bench_o2.py`).
+
+## O2: key estimation
+
+**Not scored yet.** O2's key criterion is at least 75% exact on about 100 hand-labelled excerpts, each labelled separately by two people. The 100 MIR-1K excerpts and the rating page are ready (`adaptitune key-excerpts`, `tools/key_rater.html`), and the labels are with the raters. `adaptitune key-agreement` and `eval-keys` score them when they are back. Until then, the evidence is the Essen folksong collection: real melodies, rendered as synthetic singing.
 
 The estimator was rebuilt and tuned on the training volumes of the Essen collection (4,670 songs). It was then tested on 2,486 different songs, rendered as in-tune and amateur singing. Details are in [O2_PROTOCOL.md](O2_PROTOCOL.md#b2-development-and-held-out-test-on-the-essen-folksong-collection).
 
@@ -47,25 +61,54 @@ The estimator was rebuilt and tuned on the training volumes of the Essen collect
 | Amateur, 8–20 s excerpt | 35.8% | **73.8%** (95% CI 72.0–75.5) |
 | Minor-key items | 39.7% | **67.5%** |
 
-* **The O2 key target (75% on about 100 hand-labelled excerpts) is within reach but not certain.** Excerpts of amateur-like singing sit right at it, so the labelled excerpts should be long (12–30 s). `adaptitune key-excerpts --source mir1k` makes them that way: one excerpt per MIR-1K song.
+* **The hand-labelled result could land on either side of 75%.** Amateur-like excerpts of 8–20 s sit right at it, so the labelled excerpts are longer: 12–30 s, one per MIR-1K song.
 * **Detuned singing is not a fair key test** (7–11%, because random 10–100 cent offsets wipe out the pitch-class evidence). O3 is therefore scored with the key the user types.
-* **Minor melodies often leave natural minor.** 64% of Essen's minor songs use the raised 7th, and only 6% stay inside natural minor. In-key snapping in a minor key therefore now allows the raised 6th and 7th too (`Key.snap_classes`), so leading tones are no longer pulled down.
+* **Minor melodies often leave natural minor.** 64% of Essen's minor songs use the raised 7th, and only 6% stay inside natural minor. In-key snapping in a minor key therefore allows the raised 6th and 7th too (`Key.snap_classes`), so leading tones are not pulled down.
 * On audio, the key came out the same from pYIN (80.0%), PESTO through ONNX (79.0%) and the true contour (80.0%), so tracker errors are not the bottleneck.
 
-## O3: correction engine (reference setting, 332 QC-passed test labels from 18 takes, FCPE)
+## O3: correction engine (VocalSet test singers)
 
-Rerun on the new corpus (both shifter copies of every test take, QC-passed labels only).
+**O3 is met.** At the reference setting the median error on notes detuned by under 50 cents is **7.7 cents**, against the 25-cent target. On notes with vibrato, the median note keeps its rate within 2% and 97% of its extent (targets ±10% and 70%).
 
-| Metric | Key typed by user | Key detected | Target |
-|---|---|---|---|
-| Median error, notes < 50 cents off | **2.5 cents** | 4.4 cents | ≤ 25 |
-| Share within 25 cents (< 50 set) | 95.8% | 69.7% | |
-| Median error, notes ≥ 50 cents off (reported separately) | 4.3 cents | 99.0 cents | |
-| Vibrato rate within ±10% | 96% | 96% | |
-| Notes keeping at least 70% of vibrato extent | 80% (median ratio 0.93) | 80% (median ratio 0.94) | ≥ 70% |
-| WORLD-detuned vs PSOLA-detuned copies (< 50 set) | 2.3 / 2.7 cents | 4.0 / 6.0 cents | |
+The reference setting is full strength, a 10 ms retune, in-key snapping and full vibrato preservation. It corrected both detuned copies of every test take that has QC-passed labels: 625 takes and 7,624 labels from the 9 test singers. The corrector runs FCPE with the WORLD quality check calibrated on the training singers. pYIN measures the output, so no note is scored by the tracker that corrected it. The key is the one stored with the take, as a user would type it, because key detection on detuned singing is near chance (see O2 keys). Records are in `docs/results/o3/`, from commit `d227c9d`.
 
-The key was detected correctly on only 2 of the 18 detuned test takes. This matches the Essen result for detuned singing (7–11%), so O3 is reported with the key typed by the user. The detected-key column shows what happens when the key is wrong.
+| | Detuned by under 50 cents | 50–100 cents (reported separately) |
+|---|---|---|
+| Labels | 3,397 | 4,227 |
+| **Median error after correction** | **7.7 cents** | 26.1 cents |
+| Within 25 cents | 74.9% | 49.5% |
+| Clean floor: the same notes in the clean take, measured by pYIN | 11.5 cents (87.2% within 25) | 11.6 cents |
+| PSOLA-detuned / WORLD-detuned copies | 7.5 / 8.1 cents | 24.7 / 28.3 cents |
+| Targets inside the key (3,281) / outside it (116) | 7.2 / 102 cents | |
+
+| Under 50 cents, by technique | Straight | Slow piano | Messa di voce | Slow forte | Vibrato |
+|---|---|---|---|---|---|
+| Median error after correction | 2.9 | 7.1 | 9.6 | 12.8 | 13.9 |
+| Clean floor | 10.4 | 11.1 | 7.8 | 11.9 | 14.2 |
+
+| Vibrato (5,039 notes with at least 20 cents of vibrato in the clean take) | Result | Target |
+|---|---|---|
+| Median change in vibrato rate | 2.0% | within ±10% |
+| Notes with the rate within ±10% | 85.4% | |
+| Median share of vibrato extent kept | 97% | at least 70% |
+| Notes keeping at least 70% of their extent | 84.5% | |
+
+* **The corrector ends up closer to the targets than the clean takes are.** The clean floor is what a corrector that exactly undid the injected error would score. pYIN hears the clean notes a median of 11.5 cents from their targets, partly from the singers' own intonation and partly because pYIN and FCPE disagree on note centres (O1). The corrector moves each note to the target FCPE hears, so it lands at 7.7. Straight singing, where the two trackers agree best, comes out at 2.9 cents; vibrato and loud singing, where they disagree most, at about 13.
+* **15.7% of the under-50 notes still end more than 50 cents off.** `scripts/o3_miss_causes.py` re-plans each one and sorts it by cause:
+
+  | Cause | Notes | Share of the set |
+  |---|---|---|
+  | The target is outside the key, so in-key snapping cannot reach it | 109 | 3.2% |
+  | The detuned note sat nearer the neighbouring semitone: offset, drift and the singer's own deviation together put it more than 50 cents out | 143 | 4.2% |
+  | The corrector merged the note with a neighbouring one | 70 | 2.1% |
+  | The corrector's note centre was past halfway for another reason | 58 | 1.7% |
+  | Right note, but pYIN hears the output an octave or more off (FCPE hears all 57 within 50 cents of the target) | 57 | 1.7% |
+  | Right note, and pYIN misreads the clean note as well | 35 | 1.0% |
+  | Right note, output measured 50–600 cents off | 61 | 1.8% |
+
+  The first two causes are beyond any corrector that snaps to the nearest note in the key, and the next two are the corrector's own note segmentation. The proposal's reason for the 50-cent line, that anything further is closer to the next semitone, applies to the second row too: the line is drawn on the constant offset alone, and drift can push a note past it. On the 2,765 notes with an in-key target that were nearer their target than the neighbouring semitone, the median error is 6.6 cents and 80.5% land within 25.
+* **A bug this run found and fixed.** WORLD resynthesizes at its own pitch estimate, and on low male voices that estimate jumps an octave on about 5% of voiced frames (7% for male3 and male4). In the first run, 74 under-50 notes with the right note planned measured an octave or more off, and FCPE heard 34 of them an octave up as well: real octave jumps in the audio, which the quality check had not caught. WORLD now takes the tracker's pitch wherever its own is missing or half an octave or more away, and the threshold was recalibrated (20.93, from 21.58). The numbers above are from the rerun. Before the fix the median was also 7.7 cents, with 16.1% misses. After it, 57 notes with the right note planned still measure an octave or more off, and FCPE hears every one of them within 50 cents of its target, so those are pYIN's errors on the processed audio.
+* **Mean RTF during this evaluation was 0.31,** at 1 thread with four jobs sharing the VM and PyTorch FCPE. That is not the O5 number.
 
 ## O4: personalization agent (simulation only, drift and fatigue on)
 
@@ -129,13 +172,11 @@ An exploration scale of 0.5 was kept because larger scales gain about one point 
 
 | | Value |
 |---|---|
-| Full-pipeline RTF, FCPE | **0.29** (tracker 0.18, plan 0.004, shift 0.10) |
-| Full-pipeline RTF, pYIN | 0.38 |
-| Full-pipeline RTF, PESTO (PyTorch) | 0.41 |
-| Target | ≤ 0.5 on the reference laptop |
+| Pitch tracker | FCPE through ONNX Runtime, so the app needs no PyTorch |
+| Quality check | Calibrated on real singing. The WORLD threshold is the 95th percentile of WORLD's copy-synthesis distortion over 135 clean takes from the 9 training singers: 20.93 (21.58 before WORLD took the tracker's pitch, see O3), in the code's own mel-cepstral distance, which is not comparable with SPTK's. Records in `docs/results/o3/quality_calibration_*.json`. In the O3 run it sent 91.6% of the corrected test audio through WORLD and the rest through PSOLA. |
+| Full-pipeline RTF on real singing | **0.22** on a quiet 4-core cloud VM at 4 threads, on 64 s of MIR-1K vocals with FCPE through ONNX Runtime (`docs/results/o5/`): analysis 0.16 (tracker, WORLD analysis and the quality check), planning 0.001, shifting 0.06. WORLD took 99% of the corrected audio. The laptop number comes from `scripts/o2_laptop_speed.py`; `--pipeline-only` runs just this step. |
+| Target | RTF ≤ 0.5 on the reference laptop |
 | Offline test | `tests/test_session_study.py::test_full_flow_offline` runs FR1–FR7 with all socket calls blocked |
-
-The quality check sends 90% of segments to PSOLA on synthetic voices, because WORLD copy-synthesis distorts them heavily: the calibrated 95th percentile is 26.7 dB against the 12 dB default. **Calibrate on real clean vocals with `adaptitune calibrate`.**
 
 ## O6: study design (power simulation)
 
@@ -146,3 +187,53 @@ These numbers detect a 15-point acceptance gain (C3 vs C1, sessions 3–5; 95% C
 | Power | 0.50 | 0.58 | 0.62 | 0.73 |
 
 This confirms what the proposal expects: with 10–15 singers, O6 should be reported as an estimate with its confidence interval, and the significance tests as exploratory.
+
+## Appendix: synthetic checks
+
+These ran before the datasets were on disk. They show that the code works end to end; they are not results for the report. `scripts/reproduce_results.sh` reruns them with no downloads, on the same cloud VM at 4 threads.
+
+### A1. O1 corpus from 144 synthetic takes
+
+| | Value |
+|---|---|
+| Takes / singers | 144 takes from 24 synthetic singers, split by singer (17 train, 4 val, 3 test) |
+| Labelled notes | 1,230, each detuned the same way with WORLD and with PSOLA (2,460 labels). 54% are detuned by more than 50 cents and kept as a separate set. |
+| QC gate (pYIN re-measures every note) | **98.8%** of labels kept (PSOLA 99.9%, WORLD 97.6%), median residual 0.31 cents |
+| Second measurement with FCPE | **99.96%** of kept labels recovered within 10 cents, median residual 0.69 cents, all 578 files match their checksums |
+| Unique test audio | 0.04 h, so `O1_test_hours_ok` is false here. The VocalSet build meets it. |
+
+### A2. O2 trackers on 40 noisy synthetic takes (SNR 0–20 dB, 4 threads)
+
+| Tracker | RPA (95% CI) | RPA within 10 cents | RCA | Overall accuracy | Voicing recall | Voicing false alarm | Octave errors | RTF (4 threads) | Peak MB |
+|---|---|---|---|---|---|---|---|---|---|
+| FCPE | **0.986** (0.968–0.998) | 0.935 | 0.990 | 0.887 | 0.996 | 0.476 | 0.005 | 0.027 | 823 |
+| PESTO (PyTorch) | 0.963 (0.937–0.983) | 0.684 | 0.978 | 0.900 | 0.933 | 0.143 | 0.016 | 0.151 | 1067 |
+| PESTO (ONNX export) | 0.956 (0.928–0.979) | 0.720 | 0.969 | 0.896 | 0.932 | 0.144 | 0.012 | 0.037 | 725 |
+| CREPE (tiny) | 0.913 (0.850–0.967) | 0.525 | 0.923 | 0.897 | 0.894 | 0.098 | 0.011 | 0.265 | 993 |
+| YIN | 0.889 (0.857–0.921) | 0.684 | 0.943 | 0.774 | 0.981 | 0.653 | 0.054 | 0.022 | 724 |
+| pYIN | 0.855 (0.803–0.903) | 0.667 | 0.861 | 0.836 | 0.841 | 0.189 | 0.006 | 0.136 | 721 |
+
+The ranking at the top matches the real benchmark: FCPE first and most precise, PESTO's ONNX export as accurate as PyTorch PESTO and four times faster. FCPE's weak spot on these takes was voicing (48% false alarms in the noise). Every tracker's accuracy peaked at 0 ms shift.
+
+### A3. O3 on the synthetic corpus (332 QC-passed test labels from 18 takes, FCPE)
+
+| Metric | Key typed by user | Key detected | Target |
+|---|---|---|---|
+| Median error, notes < 50 cents off | **2.5 cents** | 4.4 cents | ≤ 25 |
+| Share within 25 cents (< 50 set) | 95.8% | 69.7% | |
+| Median error, notes ≥ 50 cents off (reported separately) | 4.3 cents | 99.0 cents | |
+| Vibrato rate within ±10% | 96% | 96% | |
+| Notes keeping at least 70% of vibrato extent | 80% (median ratio 0.93) | 80% (median ratio 0.94) | ≥ 70% |
+| WORLD-detuned vs PSOLA-detuned copies (< 50 set) | 2.3 / 2.7 cents | 4.0 / 6.0 cents | |
+
+Here the targets come from the synthetic singers' exact contours, which is one reason these errors are far smaller than the VocalSet ones. The key was detected correctly on only 2 of the 18 detuned takes, in line with the Essen result for detuned singing.
+
+### A4. O5 full-pipeline speed on 20 s of synthetic singing (4 threads)
+
+| | Value |
+|---|---|
+| Full-pipeline RTF, FCPE (PyTorch) | **0.29** (tracker 0.18, plan 0.004, shift 0.10) |
+| Full-pipeline RTF, pYIN | 0.38 |
+| Full-pipeline RTF, PESTO (PyTorch) | 0.41 |
+
+On synthetic voices WORLD's copy-synthesis distorts heavily, so the quality check sent 90% of segments to PSOLA. Real singing goes the other way (O5 above).

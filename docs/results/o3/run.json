@@ -1,0 +1,20 @@
+{
+  "corpus": "data/corpus",
+  "tracker": "fcpe",
+  "measure_tracker": "pyin",
+  "settings": {
+    "strength": 1.0,
+    "retune_ms": 10.4,
+    "snap": "in_key",
+    "vibrato": 1.0
+  },
+  "split": "test",
+  "key_source": "user",
+  "merged_from": [
+    "results/o3_jobs/fcpe_by_pyin_0",
+    "results/o3_jobs/fcpe_by_pyin_1",
+    "results/o3_jobs/fcpe_by_pyin_2",
+    "results/o3_jobs/fcpe_by_pyin_3"
+  ],
+  "takes": 625
+}

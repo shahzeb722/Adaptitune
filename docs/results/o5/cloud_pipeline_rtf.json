@@ -1,0 +1,21 @@
+{
+  "tracker": "fcpe-onnx",
+  "audio_seconds": 63.83,
+  "rtf": 0.219,
+  "rtf_median": 0.236,
+  "stages_rtf": {
+    "analysis": 0.159,
+    "plan": 0.001,
+    "shift": 0.059
+  },
+  "route_shares": {
+    "world": 0.991,
+    "psola": 0.007,
+    "untouched": 0.002
+  },
+  "cpu": "Intel(R) Xeon(R) Processor @ 2.80GHz",
+  "cores": 4,
+  "threads": 4,
+  "target": 0.5,
+  "pass": true
+}
