@@ -56,7 +56,7 @@ None of the datasets are redistributed. Download them, then:
 | Dataset | Where | Used for |
 |---|---|---|
 | VocalSet | [zenodo.org/records/1442513](https://zenodo.org/records/1442513) (CC BY 4.0) | O1 corpus (clean in-tune singing) |
-| MIR-1K | [mirlab.org/dataset/public/MIR-1K.zip](http://mirlab.org/dataset/public/MIR-1K.zip) | O2 tracker benchmark, O2 key excerpts |
+| MIR-1K | [Figshare copy of MIR-1K.rar](https://figshare.com/articles/dataset/MIR-1K_rar/5802891) (797 MB, MD5 `1810d01457ccbb84a0b41c4da53eee74`). The original mirlab.org link now returns 404. Only `Wavfile/` and `PitchLabel/` are needed. | O2 tracker benchmark, O2 key excerpts |
 | MDB-stem-synth | [zenodo.org/records/1481172](https://zenodo.org/records/1481172) | O2 tracker benchmark |
 | MedleyDB (optional) | access request at medleydb.weebly.com | More O1 singers |
 

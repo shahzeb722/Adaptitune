@@ -6,7 +6,8 @@ at the extracted folders:
 * VocalSet (Wilkins et al. 2018), CC BY 4.0, https://zenodo.org/records/1442513
   Layout: ``.../<female1..9|male1..11>/<context>/<technique>/*.wav``. Clean solo singing,
   our main source of in-tune material for synthetic detuning.
-* MIR-1K (Hsu & Jang 2010), http://mirlab.org/dataset/public/MIR-1K.zip
+* MIR-1K (Hsu & Jang 2010). The original http://mirlab.org/dataset/public/MIR-1K.rar now returns 404;
+  a copy is at https://figshare.com/articles/dataset/MIR-1K_rar/5802891 (MD5 1810d01457ccbb84a0b41c4da53eee74)
   Layout: ``Wavfile/*.wav`` (stereo, left = accompaniment, right = vocal) and
   ``PitchLabel/*.pv`` (one semitone value per 20 ms frame, first frame centred at 20 ms,
   0 = unvoiced). Used for the tracker benchmark.
