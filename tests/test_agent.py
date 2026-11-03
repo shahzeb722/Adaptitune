@@ -6,7 +6,7 @@ from adaptitune.agent.features import D_ACTION, action_quad, context_from_track,
 from adaptitune.agent.policies import POLICIES, PersonalPosterior, PopulationModel
 from adaptitune.agent.reward import Feedback, reward
 from adaptitune.agent.simulator import MODELS, SimSinger, oracle_best
-from adaptitune.correction.settings import FIXED_CLASSIC, action_grid, action_index, action_matrix
+from adaptitune.correction.settings import FIXED_CLASSIC, action_index, action_matrix
 
 
 @pytest.fixture(scope="module")

@@ -23,23 +23,23 @@ AdaptiTune corrects a recorded vocal the way classic auto-tune does: it detects 
 ```bash
 python3.11 -m venv .venv && source .venv/bin/activate      # Windows: .venv\Scripts\activate
 pip install -e ".[app,dev,study]"
-pytest                                                     # 51 tests, about 30 s
+pytest                                                     # about 90 tests, 3-4 minutes
 adaptitune-app                                             # the desktop app
 adaptitune correct my_take.wav fixed.wav --key "A minor"   # one file from the command line
 ```
 
-The neural trackers are optional: `pip install -e ".[neural]"` adds PESTO, FCPE and CREPE (this pulls in PyTorch). Without them the app falls back to pYIN, and with an exported ONNX model it uses ONNX Runtime and needs no PyTorch at all.
+The neural trackers are optional: `pip install -e ".[neural]"` adds PESTO, FCPE and CREPE (this pulls in PyTorch). `pip install -e ".[eval]"` adds music21 for the Essen key validation (`adaptitune key-eval`). Without them the app falls back to pYIN, and with an exported ONNX model it uses ONNX Runtime and needs no PyTorch at all.
 
 ## What is where
 
 | Proposal | Code | Check |
 |---|---|---|
 | 5.1 Audio input and preprocessing | `adaptitune/audio.py` | |
-| 5.3 Pitch analysis unit (PESTO, FCPE, CREPE, pYIN) | `adaptitune/pitch/trackers.py` | O2 `adaptitune bench-trackers` |
-| 5.3 Key estimation, user override | `adaptitune/pitch/key.py` | O2 `adaptitune eval-keys` |
+| 5.3 Pitch analysis unit (PESTO, FCPE, CREPE, pYIN) | `adaptitune/pitch/trackers.py`, `bench/trackers.py` | O2 `adaptitune bench-trackers`, `choose-tracker` |
+| 5.3 Key estimation, user override | `adaptitune/pitch/key.py`, `bench/keys.py`, `bench/key_labels.py`, `tools/key_rater.html` | O2 `adaptitune key-eval`, `key-excerpts`, `key-agreement`, `eval-keys` |
 | 5.3 Correction planner and four settings | `adaptitune/correction/planner.py`, `settings.py` | O3 |
 | 5.3 WORLD / PSOLA with quality check | `adaptitune/correction/shifter.py` | O3, `adaptitune calibrate` |
-| 5.2 Synthetic detuning corpus | `adaptitune/data/detune.py`, `datasets.py` | O1 `adaptitune verify-corpus` |
+| 5.2 Synthetic detuning corpus | `adaptitune/data/detune.py`, `datasets.py` | O1 `adaptitune build-corpus`, `verify-corpus`, `corpus-stats` |
 | 5.4 Contextual bandit and reward | `adaptitune/agent/policies.py`, `reward.py`, `features.py` | O4 |
 | 5.4 Simulated singers (3 models, drift, fatigue) | `adaptitune/agent/simulator.py`, `experiment.py` | O4 `adaptitune simulate` |
 | 5.5 Offline deployment, ONNX, SQLite profile | `adaptitune/app/`, `agent/profile.py`, `scripts/export_onnx.py` | O5 `adaptitune rtf` |
@@ -47,18 +47,30 @@ The neural trackers are optional: `pip install -e ".[neural]"` adds PESTO, FCPE 
 | 5.7 Study protocol and analysis | `adaptitune/study/` | O6 `adaptitune study-plan`, `study-analyze` |
 | Metrics (RPA/RCA, cents error, vibrato, naturalness) | `adaptitune/metrics.py` | |
 
-Results so far, and what still needs real data, are in [docs/RESULTS.md](docs/RESULTS.md). The architecture notes and a guide to who owns what are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). A code knowledge graph made with graphify is in `graphify-out/` (open `graph.html`).
+Results so far, and what still needs real data, are in [docs/RESULTS.md](docs/RESULTS.md). The O1 corpus datasheet is [docs/O1_CORPUS.md](docs/O1_CORPUS.md), and the O2 method, fixed before any real-data run, is [docs/O2_PROTOCOL.md](docs/O2_PROTOCOL.md). The architecture notes and a guide to who owns what are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). A code knowledge graph made with graphify is in `graphify-out/` (open `graph.html`).
 
 ## Using the real datasets
 
 None of the datasets are redistributed. Download them, then:
 
+| Dataset | Where | Used for |
+|---|---|---|
+| VocalSet | [zenodo.org/records/1442513](https://zenodo.org/records/1442513) (CC BY 4.0) | O1 corpus (clean in-tune singing) |
+| MIR-1K | [mirlab.org/dataset/public/MIR-1K.zip](http://mirlab.org/dataset/public/MIR-1K.zip) | O2 tracker benchmark, O2 key excerpts |
+| MDB-stem-synth | [zenodo.org/records/1481172](https://zenodo.org/records/1481172) | O2 tracker benchmark |
+| MedleyDB (optional) | access request at medleydb.weebly.com | More O1 singers |
+
 ```bash
-adaptitune bench-trackers --dataset mir1k --root /data/MIR-1K
-adaptitune bench-trackers --dataset mdb   --root /data/MDB-stem-synth
-adaptitune build-corpus results/corpus --source vocalset --root /data/VocalSet
-adaptitune calibrate results/corpus/clean/*.wav        # WORLD quality-check threshold
-adaptitune eval-corrector results/corpus --key-source user
+python scripts/export_onnx.py --out models/pesto.onnx                       # deployable PESTO, benchmarked as pesto-onnx
+adaptitune bench-trackers --dataset mir1k --root data/raw/MIR-1K --audit    # O2, see docs/O2_PROTOCOL.md
+adaptitune bench-trackers --dataset mdb   --root data/raw/MDB-stem-synth --audit
+adaptitune choose-tracker --results results/trackers                        # the pre-registered rule
+adaptitune build-corpus data/corpus --source vocalset --root data/raw/VocalSet --workers 4   # O1, see docs/O1_CORPUS.md
+adaptitune corpus-stats data/corpus                                         # O1_test_hours_ok, O1_singers_disjoint
+adaptitune verify-corpus data/corpus --tracker fcpe                         # every kept offset re-measured
+adaptitune key-excerpts data/raw/MIR-1K --source mir1k --out key_excerpts   # then label with tools/key_rater.html
+adaptitune calibrate data/corpus/clean/*.wav                                # WORLD quality-check threshold
+adaptitune eval-corrector data/corpus --key-source user
 ```
 
 `scripts/reproduce_results.sh` runs the whole set on synthetic singing, so it works with no downloads.

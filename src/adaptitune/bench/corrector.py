@@ -20,8 +20,7 @@ import pandas as pd
 from .. import metrics as M
 from ..audio import load
 from ..correction.settings import REFERENCE, CorrectionSettings
-from ..data.detune import load_labels
-from ..music import Key
+from ..data.detune import load_labels, load_manifest
 from ..pipeline import Corrector
 
 
@@ -38,37 +37,42 @@ def evaluate(
     key in would (this isolates the corrector, which is what O3 measures); ``"estimated"``
     detects it from the detuned audio, which shows the cost of key-detection errors."""
     corpus = Path(corpus_dir)
-    keys = pd.read_csv(corpus / "manifest.csv").set_index("take")["key"].to_dict()
+    man = load_manifest(corpus)
+    keys = man.drop_duplicates("take").set_index("take")["key"].to_dict()
+    det_path = {(r["take"], r["route"]): r["detuned"] for _, r in man.iterrows()}
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
-    labels = pd.DataFrame([asdict(lb) for lb in load_labels(corpus)])
+    # only labels that passed the corpus QC gate (all of them for schema-1 corpora)
+    labels = pd.DataFrame([asdict(lb) for lb in load_labels(corpus, qc_only=True)])
     if split:
         labels = labels[labels.split == split]
     c = Corrector(tracker)
-    rows = []
-    for k, (take, g) in enumerate(labels.groupby("take")):
+    hop = c.hop_s
+    rows, clean_cache = [], {}
+    for k, ((take, route), g) in enumerate(labels.groupby(["take", "route"])):
         if max_takes and k >= max_takes:
             break
-        det = load(corpus / "detuned" / f"{take}.wav", normalize=False)
-        clean = load(corpus / "clean" / f"{take}.wav", normalize=False)
+        det = load(corpus / det_path.get((take, route), f"detuned/{take}.wav"), normalize=False)
+        if take not in clean_cache:
+            clean = load(corpus / "clean" / f"{take}.wav", normalize=False)
+            clean_cache = {take: M.contour_midi(c.tracker.track(clean.samples, clean.sr, hop).f0)}
+        mc = clean_cache[take]
         an = c.analyze(det, key=keys[take] if key_source == "user" else None)
         res = c.correct(an, settings, score=False)
-        out_tr = c.tracker.track(res.audio.samples, res.audio.sr, c.hop_s)
-        clean_tr = c.tracker.track(clean.samples, clean.sr, c.hop_s)
-        mo, mc = M.contour_midi(out_tr.f0), M.contour_midi(clean_tr.f0)
-        hop = c.hop_s
+        out_tr = c.tracker.track(res.audio.samples, res.audio.sr, hop)
+        mo = M.contour_midi(out_tr.f0)
         for _, r in g.iterrows():
-            a, b = int(r.start / hop), int(r.end / hop)
+            a, b = int(round(r.start / hop)), int(round(r.end / hop))
             ctr = M.note_center(mo, a, b)
             r0, e0 = M.vibrato(mc[a:b], hop)
             r1, e1 = M.vibrato(mo[a:b], hop)
             rows.append(
                 dict(
-                    take=take, index=r["index"], route=r.route, highly_detuned=r.highly_detuned,
+                    take=take, index=r["index"], route=route, highly_detuned=r.highly_detuned,
                     offset_cents=r.offset_cents, target=r.target_midi,
                     error_cents=100 * (ctr - r.target_midi) if not np.isnan(ctr) else np.nan,
                     vib_rate_clean=r0, vib_rate_out=r1, vib_extent_clean=e0, vib_extent_out=e1,
-                    key_used=an.key.name, key_true=keys[take], rtf=res.rtf,
+                    key_used=an.key.name if an.key else "", key_true=keys[take], rtf=res.rtf,
                 )
             )
     df = pd.DataFrame(rows)
@@ -91,6 +95,7 @@ def summarize(df: pd.DataFrame) -> dict:
     s = {
         "notes": len(df),
         "key_correct_share": float((df.groupby("take").key_used.first() == df.groupby("take").key_true.first()).mean()),
+        "takes": int(df["take"].nunique()),
         "median_abs_err_lt50": float(low.abs_err.median()),
         "share_within_25_lt50": float((low.abs_err <= 25).mean()),
         "median_abs_err_ge50": float(high.abs_err.median()) if len(high) else float("nan"),
@@ -99,7 +104,7 @@ def summarize(df: pd.DataFrame) -> dict:
         "vibrato_rate_within_10pct": float(rate_ok.mean()) if len(has_vib) else float("nan"),
         "vibrato_extent_ge_70pct": float(ext_ok.mean()) if len(has_vib) else float("nan"),
         "median_vibrato_extent_ratio": float((has_vib.vib_extent_out / has_vib.vib_extent_clean).median()) if len(has_vib) else float("nan"),
-        "mean_rtf": float(df.groupby("take").rtf.first().mean()),
+        "mean_rtf": float(df.groupby(["take", "route"]).rtf.first().mean()),
     }
     for route, g in low.groupby("route"):
         s[f"median_abs_err_lt50_{route}"] = float(g.abs_err.median())
@@ -111,32 +116,10 @@ def summarize(df: pd.DataFrame) -> dict:
 
 
 def evaluate_keys(label_csv: str | Path, tracker: str = "auto", audio_root: str | Path = ".") -> dict:
-    """Key accuracy on hand-labelled excerpts plus inter-rater agreement (O2: >= 75 %).
+    """Key accuracy on the hand-labelled excerpts (see :mod:`adaptitune.bench.key_labels`)."""
+    from .key_labels import evaluate_key_labels
 
-    CSV columns: ``path,key_rater1,key_rater2`` (e.g. ``A minor``). The reference is rater 1
-    where both agree; disagreements are reported and excluded from the accuracy.
-    """
-    from ..data.datasets import read_key_labels
-    from ..pitch.key import estimate_key, same_key_or_relative
-
-    rows = read_key_labels(label_csv)
-    c = Corrector(tracker)
-    out = []
-    for r in rows:
-        k1, k2 = Key.parse(r["key_rater1"]), Key.parse(r.get("key_rater2") or r["key_rater1"])
-        audio = load(Path(audio_root) / r["path"])
-        tr = c.tracker.track(audio.samples, audio.sr)
-        est, conf = estimate_key(tr.f0, tr.voicing)
-        out.append(dict(path=r["path"], agree=k1 == k2, ref=k1.name, est=est.name, exact=est == k1, scale_equiv=same_key_or_relative(est, k1), conf=conf))
-    df = pd.DataFrame(out)
-    agreed = df[df.agree]
-    return {
-        "excerpts": len(df),
-        "rater_agreement": float(df.agree.mean()),
-        "accuracy_exact": float(agreed.exact.mean()),
-        "accuracy_scale_equivalent": float(agreed.scale_equiv.mean()),
-        "O2_key_pass": bool(agreed.exact.mean() >= 0.75),
-    }
+    return evaluate_key_labels(label_csv, tracker, audio_root)
 
 
 def calibrate_mcd_threshold(clean_files: list[str | Path], percentile: float = 95, hop_s: float = 0.005) -> float:

@@ -1,9 +1,9 @@
 import numpy as np
 import pytest
 
-from adaptitune.data.synth import SungNote, random_melody, sing
+from adaptitune.data.synth import SungNote, sing
 from adaptitune.music import Key, hz_to_midi, midi_to_hz, nearest_in_scale
-from adaptitune.pitch.key import estimate_key, same_key_or_relative
+from adaptitune.pitch.key import estimate_key
 
 
 def test_hz_midi_roundtrip():
@@ -31,7 +31,7 @@ def tonal_melody(rng, tonic, mode, n=24):
     pool = [m for m in range(55, 75) if m % 12 in k.pitch_classes]
     w = np.array([3.0 if m % 12 in triad else 1.0 for m in pool])
     mel = list(rng.choice(pool, size=n, p=w / w.sum()))
-    root = min((m for m in pool if m % 12 == tonic))
+    root = min(m for m in pool if m % 12 == tonic)
     return [root] + mel + [root]
 
 

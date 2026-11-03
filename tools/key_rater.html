@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AdaptiTune key rater</title>
+<style>
+  :root {
+    --bg: #f7f7f5; --panel: #ffffff; --ink: #1d1d1b; --muted: #6b6b66; --line: #deddd8;
+    --accent: #2f6f5e; --accent-ink: #ffffff; --sel: #d8ece5; --warn: #9a5b13;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #161715; --panel: #1f201e; --ink: #ecebe6; --muted: #a3a29b; --line: #34352f;
+            --accent: #6fbfa6; --accent-ink: #0f1a16; --sel: #23413a; --warn: #e0a35a; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 20px 16px 48px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 16px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin-bottom: 14px; }
+  label { color: var(--muted); font-size: 13px; display: block; margin-bottom: 4px; }
+  input[type=text], textarea { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink); font: inherit; }
+  textarea { min-height: 54px; resize: vertical; }
+  button { font: inherit; border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 6px; padding: 7px 12px; cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  button.on { background: var(--sel); border-color: var(--accent); }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .grow { flex: 1 1 200px; }
+  .keys { display: grid; grid-template-columns: 70px repeat(12, 1fr); gap: 4px; align-items: center; margin: 10px 0; }
+  .keys span { color: var(--muted); font-size: 13px; }
+  .keys button { padding: 8px 0; min-width: 0; }
+  .progress { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; margin: 8px 0 2px; }
+  .progress div { height: 100%; background: var(--accent); width: 0; }
+  .muted { color: var(--muted); font-size: 13px; }
+  .status { font-size: 13px; color: var(--warn); min-height: 1.2em; }
+  details summary { cursor: pointer; font-weight: 600; }
+  audio { width: 100%; margin: 8px 0; }
+  kbd { border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; font-size: 12px; }
+  .hidden { display: none; }
+  @media (max-width: 640px) {
+    .keys { grid-template-columns: repeat(6, 1fr); }
+    .keys span { grid-column: 1 / -1; margin-top: 4px; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Key rater</h1>
+  <p class="sub">Label the key of each excerpt for the AdaptiTune key-estimation test (O2). Works offline; nothing leaves this computer.</p>
+
+  <details class="panel">
+    <summary>How to label</summary>
+    <ol>
+      <li>Type your rater name, then choose the excerpt folder made by <code>adaptitune key-excerpts</code> (it holds <code>excerpts.json</code> and an <code>audio</code> folder).</li>
+      <li>Listen to the whole excerpt. Find the <b>tonic</b>, the note that sounds like "home".</li>
+      <li>Pick a key and switch the <b>drone</b> on: the right tonic sounds settled under the melody, a wrong one rubs. <b>Play scale</b> checks major against minor (the third decides).</li>
+      <li>If there is no clear tonal centre, or the excerpt changes key, choose <b>No clear key</b>.</li>
+      <li>Label on your own and do not compare with the other rater until you have both exported. Your work is saved in this browser as you go; <b>Export CSV</b> when you finish.</li>
+    </ol>
+    <p class="muted">Keys: <kbd>Space</kbd> play/pause · <kbd>←</kbd>/<kbd>→</kbd> previous/next · <kbd>D</kbd> drone · <kbd>S</kbd> scale · <kbd>1</kbd>–<kbd>3</kbd> confidence · <kbd>N</kbd> no clear key</p>
+  </details>
+
+  <section class="panel">
+    <div class="row">
+      <div class="grow"><label for="rater">Rater name</label><input id="rater" type="text" placeholder="e.g. haris" autocomplete="off"></div>
+      <div><label for="folder">Excerpt folder</label><input id="folder" type="file" webkitdirectory directory multiple></div>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button id="exportBtn">Export CSV</button>
+      <label class="muted" style="margin:0">or restore from a CSV you exported: <input id="importCsv" type="file" accept=".csv"></label>
+    </div>
+    <div class="status" id="status"></div>
+  </section>
+
+  <section class="panel hidden" id="work">
+    <div class="row">
+      <div class="grow"><b id="title">Excerpt</b> <span class="muted" id="meta"></span></div>
+      <div class="muted" id="count"></div>
+    </div>
+    <div class="progress"><div id="bar"></div></div>
+    <audio id="player" controls preload="auto"></audio>
+    <div class="row">
+      <button id="playBtn">Play</button>
+      <button id="loopBtn">Loop</button>
+      <button id="droneBtn">Drone</button>
+      <button id="scaleBtn">Play scale</button>
+      <label class="muted" style="margin:0">Drone volume <input id="vol" type="range" min="0" max="1" step="0.05" value="0.35"></label>
+    </div>
+    <div class="keys" id="keys"></div>
+    <div class="row">
+      <button id="noneBtn">No clear key</button>
+      <span class="muted">Confidence:</span>
+      <button data-conf="1">1 unsure</button><button data-conf="2">2 fairly sure</button><button data-conf="3">3 certain</button>
+    </div>
+    <div style="margin-top:10px"><label for="notes">Notes (optional)</label><textarea id="notes"></textarea></div>
+    <div class="row" style="margin-top:10px; justify-content: space-between">
+      <button id="prevBtn">← Previous</button>
+      <span class="muted" id="chosen">No key chosen</span>
+      <button id="nextBtn" class="primary">Next →</button>
+    </div>
+  </section>
+</main>
+<script>
+(() => {
+  const NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+  const SHOW = ["C", "C♯/D♭", "D", "D♯/E♭", "E", "F", "F♯/G♭", "G", "G♯/A♭", "A", "A♯/B♭", "B"];
+  const $ = (id) => document.getElementById(id);
+  let excerpts = [], urls = {}, order = [], pos = 0, labels = {}, rater = "";
+  let ctx = null, drone = null, droneGain = null;
+
+  const store = {
+    key: () => "adaptitune-key-rater:" + (rater || "anonymous"),
+    load() { try { return JSON.parse(localStorage.getItem(this.key()) || "{}"); } catch (e) { return {}; } },
+    save() { try { localStorage.setItem(this.key(), JSON.stringify({ labels, pos })); } catch (e) { /* private mode */ } },
+  };
+  const status = (t) => { $("status").textContent = t || ""; };
+
+  // deterministic per-rater order, so raters do not share order effects
+  function hash(s) { let h = 2166136261; for (const c of s) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
+  function shuffled(n, seed) {
+    const a = [...Array(n).keys()]; let x = seed || 1;
+    for (let i = n - 1; i > 0; i--) { x ^= x << 13; x ^= x >>> 17; x ^= x << 5; const j = (x >>> 0) % (i + 1); [a[i], a[j]] = [a[j], a[i]]; }
+    return a;
+  }
+
+  // ---- loading
+  $("folder").addEventListener("change", async (ev) => {
+    const files = [...ev.target.files];
+    const man = files.find((f) => f.name === "excerpts.json");
+    if (!man) { status("No excerpts.json in that folder. Choose the folder made by adaptitune key-excerpts."); return; }
+    const data = JSON.parse(await man.text());
+    excerpts = data.excerpts || [];
+    urls = {};
+    for (const f of files) if (/\.(wav|flac|mp3|ogg)$/i.test(f.name)) urls[f.name] = URL.createObjectURL(f);
+    const missing = excerpts.filter((e) => !urls[e.path.split("/").pop()]);
+    if (missing.length) status(missing.length + (missing.length === 1 ? " audio file is" : " audio files are") + " missing from the folder.");
+    else status("");
+    start();
+  });
+  $("rater").addEventListener("change", () => { rater = $("rater").value.trim(); if (excerpts.length) start(); });
+
+  function start() {
+    rater = $("rater").value.trim();
+    if (!rater) { status("Type your rater name first, then choose the folder again."); return; }
+    const saved = store.load();
+    labels = saved.labels || {};
+    order = shuffled(excerpts.length, hash(rater));
+    pos = Math.min(saved.pos || 0, Math.max(excerpts.length - 1, 0));
+    $("work").classList.remove("hidden");
+    show();
+  }
+
+  // ---- display
+  function buildKeys() {
+    const k = $("keys"); k.innerHTML = "";
+    for (const mode of ["major", "minor"]) {
+      const lab = document.createElement("span"); lab.textContent = mode === "major" ? "Major" : "Minor";
+      k.appendChild(lab);
+      NAMES.forEach((n, i) => {
+        const b = document.createElement("button");
+        b.textContent = mode === "major" ? SHOW[i] : SHOW[i].toLowerCase();
+        b.dataset.key = n + " " + mode;
+        b.title = n + " " + mode;
+        b.addEventListener("click", () => setKey(n + " " + mode));
+        k.appendChild(b);
+      });
+    }
+  }
+  function current() { return excerpts[order[pos]]; }
+  function entry() { const e = current(); return (labels[e.excerpt] = labels[e.excerpt] || {}); }
+  function show() {
+    const e = current(); if (!e) return;
+    $("title").textContent = "Excerpt " + (pos + 1) + " of " + excerpts.length;
+    $("meta").textContent = "(" + e.excerpt + ")";
+    const done = excerpts.filter((x) => labels[x.excerpt] && labels[x.excerpt].key).length;
+    $("count").textContent = done + " labelled";
+    $("bar").style.width = (100 * done / Math.max(excerpts.length, 1)) + "%";
+    $("player").src = urls[e.path.split("/").pop()] || "";
+    const en = labels[e.excerpt] || {};
+    $("notes").value = en.notes || "";
+    document.querySelectorAll("[data-key]").forEach((b) => b.classList.toggle("on", b.dataset.key === en.key));
+    $("noneBtn").classList.toggle("on", en.key === "none");
+    document.querySelectorAll("[data-conf]").forEach((b) => b.classList.toggle("on", b.dataset.conf === String(en.confidence || "")));
+    $("chosen").textContent = en.key ? (en.key === "none" ? "No clear key" : en.key) + (en.confidence ? " · confidence " + en.confidence : "") : "No key chosen";
+    if (drone) startDrone();
+  }
+  function setKey(k) { const en = entry(); en.key = k; en.at = new Date().toISOString(); store.save(); show(); }
+  function setConf(c) { const en = entry(); en.confidence = c; store.save(); show(); }
+  $("noneBtn").addEventListener("click", () => setKey("none"));
+  document.querySelectorAll("[data-conf]").forEach((b) => b.addEventListener("click", () => setConf(Number(b.dataset.conf))));
+  $("notes").addEventListener("input", () => { entry().notes = $("notes").value; store.save(); });
+  function go(d) { pos = Math.max(0, Math.min(excerpts.length - 1, pos + d)); $("player").pause(); store.save(); show(); }
+  $("prevBtn").addEventListener("click", () => go(-1));
+  $("nextBtn").addEventListener("click", () => go(1));
+  $("playBtn").addEventListener("click", () => { const p = $("player"); p.paused ? p.play() : p.pause(); });
+  $("loopBtn").addEventListener("click", () => { const p = $("player"); p.loop = !p.loop; $("loopBtn").classList.toggle("on", p.loop); });
+
+  // ---- reference tones (Web Audio)
+  function audio() { if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)(); return ctx; }
+  function keyParts() { const k = (labels[current().excerpt] || {}).key; if (!k || k === "none") return null; const [n, m] = k.split(" "); return { pc: NAMES.indexOf(n), mode: m }; }
+  function hz(midi) { return 440 * Math.pow(2, (midi - 69) / 12); }
+  function tone(freq, t0, dur, gain, dest) {
+    const c = audio(), o = c.createOscillator(), o2 = c.createOscillator(), g = c.createGain();
+    o.type = "sine"; o.frequency.value = freq; o2.type = "sine"; o2.frequency.value = freq * 2;
+    const g2 = c.createGain(); g2.gain.value = 0.25;
+    o.connect(g); o2.connect(g2); g2.connect(g); g.connect(dest || c.destination);
+    g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(gain, t0 + 0.05);
+    if (dur) { g.gain.setValueAtTime(gain, t0 + dur - 0.08); g.gain.linearRampToValueAtTime(0, t0 + dur); o.stop(t0 + dur + 0.01); o2.stop(t0 + dur + 0.01); }
+    o.start(t0); o2.start(t0);
+    return { o, o2, g };
+  }
+  function stopDrone() { if (drone) { drone.forEach((v) => { try { v.o.stop(); v.o2.stop(); } catch (e) {} }); drone = null; } $("droneBtn").classList.remove("on"); }
+  function startDrone() {
+    const k = keyParts(); stopDroneOnly();
+    if (!k) { status("Choose a key to hear its drone."); return; }
+    status("");
+    const c = audio(); droneGain = c.createGain(); droneGain.gain.value = Number($("vol").value) * 0.25; droneGain.connect(c.destination);
+    const root = 48 + k.pc; // C3..B3
+    drone = [tone(hz(root), c.currentTime, 0, 1, droneGain), tone(hz(root + 7), c.currentTime, 0, 0.6, droneGain)];
+    $("droneBtn").classList.add("on");
+  }
+  function stopDroneOnly() { if (drone) { drone.forEach((v) => { try { v.o.stop(); v.o2.stop(); } catch (e) {} }); } drone = null; }
+  $("droneBtn").addEventListener("click", () => (drone ? stopDrone() : startDrone()));
+  $("vol").addEventListener("input", () => { if (droneGain) droneGain.gain.value = Number($("vol").value) * 0.25; });
+  $("scaleBtn").addEventListener("click", () => {
+    const k = keyParts(); if (!k) { status("Choose a key to hear its scale."); return; }
+    const steps = k.mode === "major" ? [0, 2, 4, 5, 7, 9, 11, 12] : [0, 2, 3, 5, 7, 8, 10, 12];
+    const c = audio(); const t = c.currentTime + 0.05;
+    steps.forEach((s, i) => tone(hz(60 + k.pc + s - (k.pc > 6 ? 12 : 0)), t + i * 0.32, 0.3, 0.18));
+  });
+
+  // ---- export / import
+  function csvCell(v) { v = String(v == null ? "" : v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
+  $("exportBtn").addEventListener("click", () => {
+    if (!excerpts.length) { status("Nothing loaded yet."); return; }
+    const lines = ["excerpt,path,key,confidence,notes,rater,labelled_at"];
+    let missing = 0;
+    for (const e of excerpts) {
+      const en = labels[e.excerpt] || {};
+      if (!en.key) missing++;
+      lines.push([e.excerpt, e.path, en.key || "", en.confidence || "", en.notes || "", rater, en.at || ""].map(csvCell).join(","));
+    }
+    const blob = new Blob([lines.join("\n") + "\n"], { type: "text/csv" });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "key_labels_" + (rater || "rater") + ".csv"; a.click();
+    status(missing ? (missing === 1 ? "1 excerpt is" : missing + " excerpts are") + " still unlabelled; the CSV leaves them blank." : "Exported " + excerpts.length + " labels.");
+  });
+  function parseCsv(text) {
+    const rows = []; let row = [], cell = "", q = false;
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      if (q) { if (ch === '"' && text[i + 1] === '"') { cell += '"'; i++; } else if (ch === '"') q = false; else cell += ch; }
+      else if (ch === '"') q = true; else if (ch === ",") { row.push(cell); cell = ""; }
+      else if (ch === "\n" || ch === "\r") { if (ch === "\r" && text[i + 1] === "\n") i++; row.push(cell); rows.push(row); row = []; cell = ""; }
+      else cell += ch;
+    }
+    if (cell || row.length) { row.push(cell); rows.push(row); }
+    return rows;
+  }
+  $("importCsv").addEventListener("change", async (ev) => {
+    const f = ev.target.files[0]; if (!f) return;
+    const rows = parseCsv(await f.text()); const head = rows.shift() || [];
+    const ix = (n) => head.indexOf(n);
+    let n = 0;
+    for (const r of rows) {
+      const ex = r[ix("excerpt")]; if (!ex) continue;
+      const key = r[ix("key")]; if (!key) continue;
+      labels[ex] = { key, confidence: Number(r[ix("confidence")]) || undefined, notes: r[ix("notes")] || "", at: r[ix("labelled_at")] || "" };
+      n++;
+    }
+    store.save(); if (excerpts.length) show();
+    status("Restored " + n + " labels.");
+  });
+
+  document.addEventListener("keydown", (ev) => {
+    if (!excerpts.length || ev.target.tagName === "TEXTAREA" || ev.target.tagName === "INPUT") return;
+    if (ev.key === " ") { ev.preventDefault(); $("playBtn").click(); }
+    else if (ev.key === "ArrowRight") go(1);
+    else if (ev.key === "ArrowLeft") go(-1);
+    else if (ev.key === "d" || ev.key === "D") $("droneBtn").click();
+    else if (ev.key === "s" || ev.key === "S") $("scaleBtn").click();
+    else if (ev.key === "n" || ev.key === "N") setKey("none");
+    else if (["1", "2", "3"].includes(ev.key)) setConf(Number(ev.key));
+  });
+
+  buildKeys();
+})();
+</script>
+</body>
+</html>

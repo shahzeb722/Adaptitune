@@ -47,10 +47,10 @@ class Key:
         t = text.strip().replace("♯", "#").replace("♭", "b")
         mode = "major"
         low = t.lower()
-        if low.endswith("minor") or low.endswith(" min"):
+        if low.endswith(("minor", " min")):
             mode = "minor"
             t = t[: t.lower().rfind("min")].strip()
-        elif low.endswith("major") or low.endswith(" maj"):
+        elif low.endswith(("major", " maj")):
             t = t[: t.lower().rfind("maj")].strip()
         elif len(t) >= 2 and t.endswith("m"):
             mode, t = "minor", t[:-1]
@@ -80,3 +80,19 @@ def nearest_in_scale(midi: float, key: Key | None) -> int:
             if d < best_d - 1e-9:
                 best, best_d = cand, d
     return best
+
+
+def tuning_offset_cents(midi: np.ndarray, weights: np.ndarray | None = None) -> float:
+    """Global tuning of a set of pitches relative to A440 equal temperament, in cents
+    (-50, 50]: the weighted circular mean of their distance from the nearest semitone. A choir
+    or singer that is 30 cents flat throughout gives about -30."""
+    m = np.asarray(midi, dtype=np.float64)
+    w = np.ones_like(m) if weights is None else np.asarray(weights, dtype=np.float64)
+    ok = ~np.isnan(m) & (w > 0)
+    if not ok.any():
+        return 0.0
+    z = np.sum(w[ok] * np.exp(2j * np.pi * m[ok]))
+    if abs(z) < 1e-12:
+        return 0.0
+    c = float(np.angle(z) / (2 * np.pi) * 100)
+    return 50.0 if c <= -50 else c

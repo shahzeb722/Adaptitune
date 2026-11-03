@@ -7,6 +7,7 @@ the always-available fallback.
 
 from __future__ import annotations
 
+import os
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -16,7 +17,36 @@ import numpy as np
 from ..audio import ANALYSIS_SR, resample
 
 DEFAULT_HOP_S = 0.005
-FMIN, FMAX = 65.0, 1100.0  # C2 .. C#6, covers bass to soprano
+FMIN, FMAX = 65.0, 1100.0  # C2 .. C#6, covers bass to soprano (the app's search range)
+# The O2 benchmark searches C1 .. B6 for every tracker that takes a range: the native range
+# of CREPE and FCPE, and wide enough for the bass and flute stems in MDB-stem-synth.
+BENCH_FMIN, BENCH_FMAX = 32.70, 1975.5
+
+
+def default_threads() -> int:
+    """CPU threads for model inference: $ADAPTITUNE_THREADS, else up to 4 (the reference
+    laptop has 4 cores, proposal 5.3)."""
+    try:
+        return max(1, int(os.environ["ADAPTITUNE_THREADS"]))
+    except (KeyError, ValueError):
+        return max(1, min(4, os.cpu_count() or 1))
+
+
+def _interp_log(src_t: np.ndarray, f: np.ndarray, t: np.ndarray) -> np.ndarray:
+    """Resample a frequency series (0 = no value) in the log domain. Values are interpolated
+    only between neighbours that both have one; at the edges of a run the nearest value is
+    used, and frames with no nearby value stay 0."""
+    if len(src_t) == 0:
+        return np.zeros(len(t))
+    logf = np.where(f > 0, np.log2(np.maximum(f, 1e-6)), np.nan)
+    idx = np.clip(np.searchsorted(src_t, t), 1, max(len(src_t) - 1, 1))
+    lo, hi = idx - 1, idx
+    a, b = logf[lo], logf[hi]
+    w = np.clip((t - src_t[lo]) / np.maximum(src_t[hi] - src_t[lo], 1e-9), 0, 1)
+    out = np.where(np.isnan(a) | np.isnan(b), np.nan, a + w * (b - a))
+    near = np.where(w < 0.5, a, b)  # nearest-neighbour fallback at voicing edges
+    out = np.where(np.isnan(out), near, out)
+    return np.where(np.isnan(out), 0.0, 2**out)
 
 
 @dataclass
@@ -27,6 +57,9 @@ class PitchTrack:
     hop_s: float
     tracker: str = ""
     seconds: float = 0.0  # wall-clock time spent
+    # The tracker's pitch estimate on every frame, before its voicing decision (0 where it
+    # has none). Used for voicing-independent raw pitch accuracy (mir_eval convention).
+    raw_f0: np.ndarray | None = None
 
     @property
     def voiced(self) -> np.ndarray:
@@ -38,20 +71,14 @@ class PitchTrack:
         if n_frames is None:
             n_frames = int(np.floor(self.times[-1] / hop_s)) + 1 if len(self.times) else 0
         t = np.arange(n_frames) * hop_s
-        v = np.interp(t, self.times, self.voicing, left=0, right=0)
-        # interpolate in log-frequency, only between voiced neighbours
-        logf = np.where(self.f0 > 0, np.log2(np.maximum(self.f0, 1e-6)), np.nan)
-        idx = np.clip(np.searchsorted(self.times, t), 1, max(len(self.times) - 1, 1))
-        lo, hi = idx - 1, idx
-        a = logf[lo] if len(logf) else np.array([])
-        b = logf[hi] if len(logf) else np.array([])
-        w = np.clip((t - self.times[lo]) / np.maximum(self.times[hi] - self.times[lo], 1e-9), 0, 1)
-        f = np.where(np.isnan(a) | np.isnan(b), np.nan, a + w * (b - a))
-        # nearest-neighbour fallback at voicing edges
-        near = np.where(w < 0.5, a, b)
-        f = np.where(np.isnan(f), near, f)
-        f0 = np.where(np.isnan(f), 0.0, 2**f)
-        return PitchTrack(t, f0, v, hop_s, self.tracker, self.seconds)
+        v = np.interp(t, self.times, self.voicing, left=0, right=0) if len(self.times) else np.zeros(n_frames)
+        f0 = _interp_log(self.times, self.f0, t)
+        raw = None if self.raw_f0 is None else _interp_log(self.times, self.raw_f0, t)
+        if raw is not None:
+            # near a voicing edge the two interpolations see different neighbours; a voiced frame
+            # must report one pitch, so the raw curve takes the voiced value there
+            raw = np.where(f0 > 0, f0, raw)
+        return PitchTrack(t, f0, v, hop_s, self.tracker, self.seconds, raw)
 
 
 class Tracker(ABC):
@@ -108,18 +135,20 @@ class PyinTracker(Tracker):
             hop_length=hop,
             center=True,
             resolution=self.resolution,
+            fill_na=None,  # best-guess pitch on unvoiced frames too (raw pitch)
         )
-        f0 = np.where(voiced & ~np.isnan(f0), f0, 0.0)
+        raw = np.nan_to_num(np.asarray(f0, np.float64))
         # pYIN reports the centre of its pitch state, i.e. it is quantized to `resolution`.
         # Refine with YIN's parabolic-interpolated estimate wherever both agree within a
         # quarter tone, keeping pYIN's voicing and octave decisions.
         if self.refine:
             fy = librosa.yin(y, fmin=self.fmin, fmax=self.fmax, sr=sr, frame_length=self.frame_length, hop_length=hop)
-            k = min(len(fy), len(f0))
-            agree = (f0[:k] > 0) & (np.abs(12 * np.log2(np.maximum(fy[:k], 1) / np.maximum(f0[:k], 1))) < 0.5)
-            f0[:k] = np.where(agree, fy[:k], f0[:k])
+            k = min(len(fy), len(raw))
+            agree = (raw[:k] > 0) & (np.abs(12 * np.log2(np.maximum(fy[:k], 1) / np.maximum(raw[:k], 1))) < 0.5)
+            raw[:k] = np.where(agree, fy[:k], raw[:k])
+        f0 = np.where(voiced, raw, 0.0)
         t = np.arange(len(f0)) * hop / sr
-        return PitchTrack(t, f0, np.nan_to_num(prob), hop / sr)
+        return PitchTrack(t, f0, np.nan_to_num(prob), hop / sr, raw_f0=raw)
 
 
 class YinTracker(Tracker):
@@ -147,15 +176,19 @@ class YinTracker(Tracker):
         per = np.clip(num / den * 2, 0, 1)
         prob = per * loud
         voiced = prob > 0.45
-        f0 = np.where(voiced, f0, 0.0)
+        raw = np.asarray(f0, np.float64)
+        f0 = np.where(voiced, raw, 0.0)
         t = np.arange(len(f0)) * hop / sr
-        return PitchTrack(t, f0, prob, hop / sr)
+        return PitchTrack(t, f0, prob, hop / sr, raw_f0=raw)
 
 
 class PestoTracker(Tracker):
     """PESTO (Riou et al. 2023), ~130k-parameter self-supervised tracker."""
 
     name = "pesto"
+
+    def __init__(self, threshold: float = 0.5):
+        self.threshold = threshold
 
     @classmethod
     def available(cls) -> bool:
@@ -177,8 +210,7 @@ class PestoTracker(Tracker):
         if t.max() > 10 * len(y) / sr:  # some versions return ms
             t = t / 1000
         conf = np.clip(conf, 0, 1)
-        f0 = np.where(conf > 0.5, f0, 0.0)
-        return PitchTrack(t, f0, conf, hop_s)
+        return PitchTrack(t, np.where(conf > self.threshold, f0, 0.0), conf, hop_s, raw_f0=f0)
 
 
 class FcpeTracker(Tracker):
@@ -196,27 +228,41 @@ class FcpeTracker(Tracker):
         except Exception:
             return False
 
-    def _track(self, y, sr, hop_s):
-        import torch
-        from torchfcpe import spawn_bundled_infer_model
+    def __init__(self, threshold: float = 0.006, fmin: float = FMIN, fmax: float = FMAX):
+        self.threshold = threshold  # torchfcpe's default voicing threshold on the peak latent
+        self.fmin, self.fmax = fmin, fmax
 
-        if FcpeTracker._model is None:
+    @classmethod
+    def _load(cls):
+        if cls._model is None:
             import contextlib
             import sys
 
+            from torchfcpe import spawn_bundled_infer_model
+
             with contextlib.redirect_stdout(sys.stderr):  # torchfcpe prints INFO lines to stdout
-                FcpeTracker._model = spawn_bundled_infer_model(device="cpu")
-        n = int(np.ceil(len(y) / sr / hop_s))
+                cls._model = spawn_bundled_infer_model(device="cpu")
+        return cls._model
+
+    def _track(self, y, sr, hop_s):
+        import torch
+
+        m = self._load()
         x = torch.tensor(y, dtype=torch.float32)[None, :, None]
         with torch.no_grad():
-            f0 = FcpeTracker._model.infer(
-                x, sr=sr, decoder_mode="local_argmax", threshold=0.006,
-                f0_min=FMIN, f0_max=FMAX, interp_uv=False, output_interp_target_length=n,
-            )
-        f0 = f0.squeeze().cpu().numpy().astype(np.float64)
-        f0 = np.where(f0 > FMIN * 0.9, f0, 0.0)
-        conf = (f0 > 0).astype(np.float64)
-        return PitchTrack(np.arange(len(f0)) * hop_s, f0, conf, hop_s)
+            # Same steps as torchfcpe's ``infer`` (mel -> network -> local-argmax decoding),
+            # but without its voicing mask, so the raw pitch of every frame is kept.
+            latent = m.model.forward(m.wav2mel(x, sr))
+            cents = m.model.latent2cents_local_decoder(latent, mask=False)
+            raw = m.model.cent_to_f0(cents).squeeze().cpu().numpy().astype(np.float64)
+            conf = latent.max(dim=-1).values.squeeze().cpu().numpy().astype(np.float64)
+        raw = np.atleast_1d(np.clip(np.nan_to_num(raw), 0, self.fmax))
+        conf = np.atleast_1d(conf)
+        voiced = (conf > self.threshold) & (raw > self.fmin * 0.9)
+        f0 = np.where(voiced, raw, 0.0)
+        hop = m.get_hop_size() / m.get_model_sr()
+        # voicing stays binary as before, so the planner and quality check behave the same
+        return PitchTrack(np.arange(len(f0)) * hop, f0, voiced.astype(np.float64), hop, raw_f0=raw)
 
 
 class CrepeTracker(Tracker):
@@ -224,8 +270,9 @@ class CrepeTracker(Tracker):
 
     name = "crepe"
 
-    def __init__(self, model: str = "tiny"):
-        self.model = model
+    def __init__(self, model: str = "tiny", threshold: float = 0.4, fmin: float = FMIN, fmax: float = FMAX):
+        self.model, self.threshold = model, threshold
+        self.fmin, self.fmax = fmin, fmax
 
     @classmethod
     def available(cls) -> bool:
@@ -243,12 +290,12 @@ class CrepeTracker(Tracker):
         hop = int(round(hop_s * sr))
         x = torch.tensor(y, dtype=torch.float32)[None]
         f0, per = torchcrepe.predict(
-            x, sr, hop, FMIN, FMAX, self.model, return_periodicity=True, batch_size=512, device="cpu"
+            x, sr, hop, self.fmin, self.fmax, self.model, return_periodicity=True, batch_size=512, device="cpu"
         )
-        f0 = f0.squeeze().numpy().astype(np.float64)
+        raw = f0.squeeze().numpy().astype(np.float64)
         per = per.squeeze().numpy().astype(np.float64)
-        f0 = np.where(per > 0.4, f0, 0.0)
-        return PitchTrack(np.arange(len(f0)) * hop / sr, f0, per, hop / sr)
+        f0 = np.where(per > self.threshold, raw, 0.0)
+        return PitchTrack(np.arange(len(f0)) * hop / sr, f0, per, hop / sr, raw_f0=raw)
 
 
 class OnnxTracker(Tracker):
@@ -261,21 +308,44 @@ class OnnxTracker(Tracker):
 
     name = "onnx"
 
-    def __init__(self, path: str, model_hop_s: float = 0.01, threshold: float = 0.5):
+    def __init__(self, path: str, model_hop_s: float = 0.01, threshold: float = 0.5, threads: int | None = None):
         import onnxruntime as ort
 
         so = ort.SessionOptions()
-        so.intra_op_num_threads = 4
+        so.intra_op_num_threads = threads or default_threads()
+        so.inter_op_num_threads = 1
+        self.path = path
         self.sess = ort.InferenceSession(path, so, providers=["CPUExecutionProvider"])
         self.model_hop_s = model_hop_s
         self.threshold = threshold
 
     def _track(self, y, sr, hop_s):
         inp = self.sess.get_inputs()[0].name
-        f0, conf = self.sess.run(None, {inp: y.astype(np.float32)[None]})
-        f0, conf = f0[0].astype(np.float64), np.clip(conf[0].astype(np.float64), 0, 1)
-        f0 = np.where(conf > self.threshold, f0, 0.0)
-        return PitchTrack(np.arange(len(f0)) * self.model_hop_s, f0, conf, self.model_hop_s)
+        raw, conf = self.sess.run(None, {inp: y.astype(np.float32)[None]})
+        raw, conf = raw[0].astype(np.float64), np.clip(conf[0].astype(np.float64), 0, 1)
+        f0 = np.where(conf > self.threshold, raw, 0.0)
+        return PitchTrack(np.arange(len(f0)) * self.model_hop_s, f0, conf, self.model_hop_s, raw_f0=raw)
+
+
+class PestoOnnxTracker(OnnxTracker):
+    """PESTO exported with ``scripts/export_onnx.py`` (the deployment form of PESTO). Listed
+    in the benchmark so the export is measured exactly as the app runs it."""
+
+    name = "pesto-onnx"
+
+    def __init__(self, path: str | None = None, **kw):
+        path = path or find_onnx_model()
+        if not path:
+            raise RuntimeError("no exported model found; run scripts/export_onnx.py --out models/pesto.onnx")
+        super().__init__(path, **kw)
+
+    @classmethod
+    def available(cls) -> bool:
+        try:
+            import onnxruntime  # noqa: F401
+        except Exception:
+            return False
+        return find_onnx_model() is not None
 
 
 REGISTRY: dict[str, type[Tracker]] = {
@@ -284,6 +354,7 @@ REGISTRY: dict[str, type[Tracker]] = {
     "pesto": PestoTracker,
     "fcpe": FcpeTracker,
     "crepe": CrepeTracker,
+    "pesto-onnx": PestoOnnxTracker,
 }
 
 

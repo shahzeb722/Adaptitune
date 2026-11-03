@@ -21,7 +21,7 @@
 | Stream | Owner | Modules |
 |---|---|---|
 | Agent, experiments, ethics, integration and testing | Muhammad Shahzeb Khan | `agent/`, `study/`, `tests/`, CI |
-| Data pipeline, trackers, metrics, ONNX | Haris Khan | `data/`, `pitch/`, `metrics.py`, `bench/`, `scripts/export_onnx.py` |
+| Data pipeline, trackers, metrics, ONNX, key labelling | Haris Khan | `data/`, `pitch/`, `metrics.py`, `bench/`, `scripts/export_onnx.py`, `tools/key_rater.html` |
 | Correction engine, desktop app, human studies | Afzaal Afzal | `correction/`, `app/`, `packaging/` |
 
 ## Settings that need calibrating with real data
@@ -30,3 +30,5 @@
 * `QualityConfig.hnr_db` (10 dB) and `min_voicing` (0.5): calibrate these on the labelled real recordings and report the share of segments that goes to each route.
 * The reward weights and the agent priors: retune them in simulation after the pilot, so the simulator's preference ranges match what pilot singers actually do.
 * `metrics.MCD_RISE_FULL`, `JUMP_RATE_FULL` and `HNR_DROP_FULL`: these scale the naturalness indicators. Check them against pilot naturalness ratings.
+* `pitch.key.KeyConfig`: the defaults were chosen on the Essen training volumes (`adaptitune key-eval`). The hand-labelled excerpts are the O2 test set, so report the estimator on them as it is. Do not retune it on them.
+* The tracker voicing thresholds are the libraries' defaults and are fixed for O2. If the app needs different ones, tune them on the corpus's development singers, never on MIR-1K or MDB-stem-synth.
