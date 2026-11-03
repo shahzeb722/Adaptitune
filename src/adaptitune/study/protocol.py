@@ -17,6 +17,7 @@ counterbalanced across participants (rotated Latin square) and shuffled within b
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -51,7 +52,9 @@ def session_conditions(session: int) -> list[str]:
 
 def schedule(participant: str, session: int, stimuli: list[str], participant_index: int, seed: int = 0) -> list[Trial]:
     """Blind, counterbalanced trial list for one session."""
-    rng = np.random.default_rng(hash((participant, session, seed)) % (2**32))
+    # a stable seed: Python's hash() of a string changes from one run to the next
+    key = f"{participant}|{session}|{seed}".encode()
+    rng = np.random.default_rng(int.from_bytes(hashlib.sha256(key).digest()[:8], "little"))
     conds = session_conditions(session)
     # counterbalancing: rotate the condition cycle by participant and session, then shuffle
     # within two blocks (before / after the break) so every condition appears in both halves

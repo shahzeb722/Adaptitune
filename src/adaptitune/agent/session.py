@@ -24,12 +24,12 @@ from pathlib import Path
 import numpy as np
 
 from ..audio import Audio, load
-from ..correction.settings import CorrectionSettings
+from ..correction.settings import CorrectionSettings, action_grid, action_index
 from ..pipeline import Analysis, Corrector, TakeResult
 from .features import context_from_analysis
 from .policies import POLICIES, PopulationModel
 from .profile import ProfileStore
-from .reward import Feedback, reward
+from .reward import Feedback
 
 
 def load_population(path: str | Path | None = None) -> PopulationModel:
@@ -66,7 +66,7 @@ class AdaptiveSession:
         self.store = store or ProfileStore()
         self.corrector = corrector or Corrector()
         self.policy = POLICIES[policy](population or load_population(), rng=np.random.default_rng(seed))
-        self.policy.post = self.store.load(user, prior_var=self.policy.post.prior_var, noise_var=self.policy.post.noise_var)
+        self.policy.set_posterior(self.store.load(user, self.policy.new_posterior))
 
     # ------------------------------------------------------------------ takes
     def load_take(self, src: str | Path | Audio, key: str | None = None) -> Take:
@@ -87,17 +87,9 @@ class AdaptiveSession:
 
     def propose_ab(self, take: Take) -> tuple[TakeResult, TakeResult]:
         """Two different versions: the agent's sampled choice and its current best guess
-        (or the population's choice if they coincide)."""
+        (or the population's choice if they coincide). The simulation uses the same rule."""
         a = self.policy.select(take.context)
-        b = self.policy.greedy(take.context)
-        if b == a:
-            b = int(np.argmax(self.policy.pop.predict(take.context)))
-        if b == a:
-            scores = self.policy.mean_scores(take.context)
-            scores[a] = -np.inf
-            b = int(np.argmax(scores))
-        from ..correction.settings import action_grid
-
+        b = self.policy.rival(take.context, a)
         g = action_grid()
         return self.corrector.correct(take.analysis, g[a]), self.corrector.correct(take.analysis, g[b])
 
@@ -105,22 +97,34 @@ class AdaptiveSession:
         return self.corrector.correct(take.analysis, settings, score=False)
 
     # ------------------------------------------------------------------ feedback
-    def _learn(self, take: Take, res: TakeResult, fb: Feedback) -> float:
+    @staticmethod
+    def _measured(res: TakeResult) -> tuple[float, float, float]:
+        """The pipeline's (a, n, p) for a corrected take."""
         a = res.accuracy if not np.isnan(res.accuracy) else 0.0
         n = res.natural.score if res.natural else 1.0
-        r = reward(fb.scaled(), a, n, res.vib_penalty)
-        self.policy.learn(take.context, res.settings.snapped(), r)
-        self.store.add_feedback(self.user, take.id, res.settings.as_dict(), take.context, fb.kind, fb.value, a, n, res.vib_penalty, r)
+        return a, n, res.vib_penalty
+
+    def _log(self, take: Take, res: TakeResult, fb: Feedback, r: float) -> None:
+        a, n, p = self._measured(res)
+        self.store.add_feedback(self.user, take.id, res.settings.as_dict(), take.context, fb.kind, fb.value, a, n, p, r)
+
+    def feedback(self, take: Take, res: TakeResult, kind: str, value: float) -> float:
+        """kind: 'keep' (1 keep / 0 discard) or 'rating' (1..5). Returns the reward r."""
+        if kind not in ("keep", "rating"):
+            raise ValueError("use feedback_ab for A/B picks")
+        fb = Feedback(kind, value)
+        r = self.policy.observe(take.context, action_index(res.settings.snapped()), kind, fb.scaled(), self._measured(res))
+        self._log(take, res, fb, r)
         self.store.save(self.user, self.policy.post)
         return r
 
-    def feedback(self, take: Take, res: TakeResult, kind: str, value: float) -> float:
-        """kind: 'keep' (1 keep / 0 discard) or 'rating' (1..5)."""
-        return self._learn(take, res, Feedback(kind, value))
-
     def feedback_ab(self, take: Take, a: TakeResult, b: TakeResult, picked: str) -> tuple[float, float]:
-        ra = self._learn(take, a, Feedback("ab", 1.0 if picked == "a" else 0.0))
-        rb = self._learn(take, b, Feedback("ab", 1.0 if picked == "b" else 0.0))
+        """One A/B judgment: ``picked`` is "a" or "b". Returns the reward r of each version."""
+        ia, ib = action_index(a.settings.snapped()), action_index(b.settings.snapped())
+        ra, rb = self.policy.observe_pair(take.context, ia, ib, picked == "a", self._measured(a), self._measured(b))
+        self._log(take, a, Feedback("ab", 1.0 if picked == "a" else 0.0), ra)
+        self._log(take, b, Feedback("ab", 1.0 if picked == "b" else 0.0), rb)
+        self.store.save(self.user, self.policy.post)
         return ra, rb
 
     def save_manual(self, take: Take, settings: CorrectionSettings, seconds: float | None = None, adjustments: int | None = None, rating: float | None = None) -> None:
@@ -133,17 +137,15 @@ class AdaptiveSession:
     # ------------------------------------------------------------------ profile
     @property
     def interactions(self) -> int:
+        """Judgments learned from so far (an A/B pick is one judgment)."""
         return self.policy.post.n
 
     def current_best(self, take: Take) -> CorrectionSettings:
-        from ..correction.settings import action_grid
-
         return action_grid()[self.policy.greedy(take.context)]
 
     def reset(self) -> None:
         self.store.reset(self.user)
-        self.policy.post = self.store.load(self.user, prior_var=self.policy.post.prior_var, noise_var=self.policy.post.noise_var)
-        self.policy.anchored = False
+        self.policy.set_posterior(self.store.load(self.user, self.policy.new_posterior))
 
     def export(self, path: str | Path) -> Path:
         return self.store.export(self.user, path)

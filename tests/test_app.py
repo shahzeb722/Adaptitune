@@ -31,8 +31,8 @@ def test_app_drives_all_features(tmp_path, detuned, monkeypatch):
     w._manual_changed()
     w._manual_done(w.session.manual(take, w._manual_settings()))
     w._manual_save()
-    assert w.session.interactions == 3
-    assert "learned from 3" in w.status.currentMessage()
+    assert w.session.interactions == 2  # a rating and one A/B pick
+    assert "learned from 2" in w.status.currentMessage()
     w._switch_user("second")
     assert w.session.interactions == 0
     w.grab()

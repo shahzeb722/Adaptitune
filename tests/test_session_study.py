@@ -42,7 +42,8 @@ def test_full_flow_offline(session, detuned, offline, tmp_path):
     man = session.manual(take, CorrectionSettings(0.5, 44.7, "in_key", 1.0))  # FR5
     session.save_manual(take, man.settings, seconds=30, adjustments=4)
     assert session.last_manual().strength == 0.5
-    assert session.interactions == 4
+    assert session.interactions == 3  # keep, rating and one A/B pick
+    assert len(session.store.history("ali")) == 4  # the A/B pick logs both versions
     out = session.export(tmp_path / "me.json")  # FR7 export
     assert out.exists() and "posterior" in out.read_text()
     session.reset()  # FR7 reset
@@ -54,9 +55,25 @@ def test_profile_persists(tmp_path, detuned):
     s1 = AdaptiveSession("sara", store, Corrector("yin"), seed=0)
     take = s1.load_take(Audio(detuned.samples, detuned.sr), key="C major")
     s1.feedback(take, s1.propose(take), "keep", 1)
+    a, b = s1.propose_ab(take)
+    s1.feedback_ab(take, a, b, "b")
     s2 = AdaptiveSession("sara", ProfileStore(tmp_path / "p.sqlite"), Corrector("yin"))
-    assert s2.interactions == 1
-    assert len(s2.store.history("sara")) == 1
+    assert s2.interactions == 2
+    assert len(s2.store.history("sara")) == 3
+    assert np.allclose(s2.policy.post.mean, s1.policy.post.mean)
+    assert s2.current_best(take) == s1.current_best(take)
+
+
+def test_old_linear_profile_starts_afresh(tmp_path):
+    """A profile saved by the first (linear) agent is replaced by a fresh logistic posterior."""
+    from adaptitune.agent.policies import LogisticPosterior, PersonalPosterior
+
+    store = ProfileStore(tmp_path / "p.sqlite")
+    old = PersonalPosterior()
+    old.update(np.ones(15), 0.5)
+    store.save("old", old)
+    s = AdaptiveSession("old", store, Corrector("yin"), seed=0)
+    assert isinstance(s.policy.post, LogisticPosterior) and s.interactions == 0
 
 
 def test_schedule_design():

@@ -49,7 +49,7 @@ The estimator was rebuilt and tuned on the training volumes of the Essen collect
 
 * **The O2 key target (75% on about 100 hand-labelled excerpts) is within reach but not certain.** Excerpts of amateur-like singing sit right at it, so the labelled excerpts should be long (12–30 s). `adaptitune key-excerpts --source mir1k` makes them that way: one excerpt per MIR-1K song.
 * **Detuned singing is not a fair key test** (7–11%, because random 10–100 cent offsets wipe out the pitch-class evidence). O3 is therefore scored with the key the user types.
-* **Minor melodies often leave natural minor.** 64% of Essen's minor songs use the raised 7th, and only 6% stay inside natural minor. In-key snapping in minor should allow the raised 6th and 7th, or it will pull leading tones down.
+* **Minor melodies often leave natural minor.** 64% of Essen's minor songs use the raised 7th, and only 6% stay inside natural minor. In-key snapping in a minor key therefore now allows the raised 6th and 7th too (`Key.snap_classes`), so leading tones are no longer pulled down.
 * On audio, the key came out the same from pYIN (80.0%), PESTO through ONNX (79.0%) and the true contour (80.0%), so tracker errors are not the bottleneck.
 
 ## O3: correction engine (reference setting, 332 QC-passed test labels from 18 takes, FCPE)
@@ -69,25 +69,61 @@ The key was detected correctly on only 2 of the 18 detuned test takes. This matc
 
 ## O4: personalization agent (simulation only, drift and fatigue on)
 
-100 singers per preference model (300 in total). The oracle is the best fixed setting for each singer in hindsight.
+300 simulated **report singers**, 100 per preference model (seed 0). The agent's two settings, its exploration scale and how much a rating counts, were chosen beforehand on 300 different **development singers** (seed 1, `scripts/tune_agent.py`). The population part is trained on a third set of 3,000 singers. The oracle is each singer's best fixed setting in hindsight. Reproduce with `scripts/run_agent_sim.py` (add `--horizon 60` for the curves, `--sensitivity` for the robustness table).
 
-| Policy | After 20 interactions: reward / oracle | Cumulative regret (20) | After 60: reward / oracle | Cumulative regret (60) |
-|---|---|---|---|---|
-| **Thompson sampling** | 0.827 | 5.48 ± 0.15 | **0.895** | **10.5 ± 0.5** |
-| LinUCB | 0.823 | 5.12 ± 0.15 | 0.845 | 11.0 ± 0.6 |
-| ε-greedy | 0.809 | 5.49 ± 0.15 | 0.839 | 13.4 ± 0.6 |
-| Discounted TS | 0.805 | 5.69 ± 0.14 | 0.883 | 12.8 ± 0.5 |
-| Population only (no learning) | 0.682 | 5.44 ± 0.24 | 0.669 | 16.6 ± 1.0 |
-| Fixed (classic auto-tune) | 0.243 | 13.2 ± 0.2 | 0.222 | 41.0 ± 0.6 |
+**O4 is met.** After 20 interactions, Thompson sampling's best guess earns **91.4%** of the oracle's reward (95% CI 89.8–92.9%, bootstrap over singers). Its cumulative regret, 3.28, is lower than ε-greedy's (3.98) and the fixed setting's (13.2). Each singer meets every policy with the same feedback noise, so the differences are paired: Thompson sampling minus ε-greedy is −0.70 (95% CI −0.94 to −0.46).
 
-**O4 is not met at 20 interactions.** Thompson sampling reaches 83% of the oracle against a 90% target, and its regret ties ε-greedy rather than beating it. By 60 interactions it reaches 89.5% and has the lowest regret of every policy. The ratio is similar across the three preference models (0.79–0.86 at 20 interactions), so this is not one convenient model carrying the result. Options before the study:
+| Policy | After 20: reward / oracle | Ideal point / logistic / threshold | Cumulative regret (20) | After 60: reward / oracle | Cumulative regret (60) |
+|---|---|---|---|---|---|
+| **Thompson sampling** | **0.914** | 0.897 / 0.923 / 0.922 | **3.28 ± 0.15** | **0.949** | 6.1 ± 0.3 |
+| Discounted TS (drift, extended work) | 0.917 | 0.893 / 0.927 / 0.933 | 3.30 ± 0.14 | 0.954 | 6.4 ± 0.3 |
+| UCB | 0.895 | 0.860 / 0.914 / 0.913 | 2.85 ± 0.15 | 0.928 | 5.9 ± 0.4 |
+| ε-greedy (ε = 0.1) | 0.856 | 0.818 / 0.886 / 0.866 | 3.98 ± 0.17 | 0.874 | 10.3 ± 0.4 |
+| First design: linear TS (ablation) | 0.812 | 0.764 / 0.855 / 0.818 | 5.59 ± 0.15 | 0.886 | 11.0 ± 0.4 |
+| Population only (no learning) | 0.709 | 0.657 / 0.740 / 0.732 | 4.91 ± 0.24 | 0.703 | 15.1 ± 0.7 |
+| Fixed (classic auto-tune) | 0.241 | 0.229 / 0.286 / 0.207 | 13.2 ± 0.2 | 0.246 | 39.4 ± 0.5 |
 
-1. **Reduce the action space the agent explores**, for example by fixing snapping per singer after the first session.
-2. **Get more judgments per session**, e.g. let the agent also learn from C2 and A/B pairs (this needs a protocol change).
-3. **Try the fallback**: pairwise preference optimization in the style of Nielsen et al.
-4. **Report it as is.** The proposal already treats a negative result as a valid result.
+Regret is mean ± standard error over the 300 singers. Thompson sampling passes 90% at about the 15th interaction (`results/agent_h60/learning_curves.png`). For individual singers, the median reaches 97% of their oracle and 73% of singers reach 90%.
 
-The plots are in `results/agent/learning_curves.png` and `regret_by_model.png`. Run `scripts/run_agent_sim.py` to regenerate them.
+**What changed since the first run (83%).** The agent's model, not its tuning. The first design fitted a linear-Gaussian model to the reward itself. A singer keeps takes made near their preferred settings and rejects almost everything else, and a quadratic in *r* cannot follow such a steep surface. As a check on development singers, a linear model fitted to the noise-free reward of all 504 settings still picks a setting worth only 84% of the oracle. So no amount of data or tuning could reach 90%. The new model splits *r* as the proposal defines it. The singer's feedback *f* gets a logistic link, and the measured *a*, *n* and *p* come from the population, because they do not depend on taste. Its ceiling on the same check is 99%. Details are in `agent/policies.py` and [ARCHITECTURE.md](ARCHITECTURE.md#the-agent). Two smaller changes apply to every policy:
+
+* **The A/B rival** is now the agent's current best guess, as the app already did. The simulation used to compare against the population's choice.
+* **Singer seeds are now stable.** They were derived from Python's `hash()` of the model name, which changes from run to run, so the old table could not be reproduced exactly. The study schedule had the same problem and is fixed too.
+
+**How sensitive is the pass?** Each row changes one assumption and reruns the comparison on the report singers:
+
+| Change | TS reward / oracle | TS regret | ε-greedy reward / oracle | ε-greedy regret | O4 |
+|---|---|---|---|---|---|
+| None (as reported) | 0.914 | 3.28 | 0.856 | 3.98 | pass |
+| Keep/discard feedback only, no ratings or A/B | 0.904 | 3.48 | 0.825 | 4.20 | pass |
+| Personal prior twice too wide | 0.930 | 3.49 | 0.870 | 3.73 | pass |
+| Personal prior half as wide | 0.878 | 3.45 | 0.832 | 4.31 | fail (ratio) |
+| Population trained on 300 singers, not 3,000 | 0.893 | 3.46 | 0.829 | 4.24 | fail (ratio) |
+| Population trained on logistic singers only | 0.925 | 3.26 | 0.845 | 3.94 | pass |
+| … on ideal-point singers only | 0.913 | 3.19 | 0.825 | 4.36 | pass |
+| … on threshold singers only | 0.909 | 3.36 | 0.833 | 4.22 | pass |
+
+In every row Thompson sampling beats ε-greedy on both measures. The 90% line itself depends on a personal prior that is wide enough and a well-trained population part.
+
+Caveats for the report:
+
+* **This is simulation.** The population and the personal prior are estimated from the same simulator as the test singers, only from different individuals. Before the study, retrain them on pilot data (ARCHITECTURE.md). The user study is the real test.
+* **UCB has lower regret than Thompson sampling** (2.85 against 3.28), though its 20-interaction best guess is worse (0.895). The O4 criterion compares Thompson sampling with ε-greedy and the fixed setting only. Report UCB anyway.
+* **Ideal-point singers are the hardest** (89.7%), because their acceptance is a plateau that a quadratic logit only approximates.
+
+Choices made on the development singers (300 singers, seed 1; `results/agent_tuning.csv`):
+
+| Policy | Setting | Reward / oracle (20) | Regret (20) |
+|---|---|---|---|
+| Thompson sampling | exploration 0.5, rating counts as 1 | 0.899 | 3.50 |
+| **Thompson sampling (chosen)** | **exploration 0.5, rating counts as 3** | **0.918** | **3.14** |
+| Thompson sampling | exploration 0.75, rating counts as 3 | 0.928 | 3.91 |
+| Thompson sampling | exploration 1.0, rating counts as 3 | 0.928 | 4.98 |
+| UCB | α = 1.0 (chosen) / 0.5 | 0.892 / 0.857 | 2.91 / 3.16 |
+| ε-greedy | ε = 0.1 | 0.850 | 3.99 |
+| Linear TS (first design) | as before | 0.822 | 5.66 |
+
+An exploration scale of 0.5 was kept because larger scales gain about one point of reward but lose the regret margin over ε-greedy.
 
 ## O5: offline application
 

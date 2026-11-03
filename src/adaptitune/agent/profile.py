@@ -1,7 +1,7 @@
 """On-device user profile (proposal 5.5, FR7, NFR3).
 
-The profile is the agent's personal weights plus a history of feedback, stored locally in a
-single SQLite file. Nothing ever leaves the machine; export writes a JSON file the user
+The profile is the agent's personal posterior (its judgments and the fitted weights) plus a
+history of feedback, stored locally in a single SQLite file. Nothing ever leaves the machine; export writes a JSON file the user
 chooses to keep.
 """
 
@@ -12,7 +12,9 @@ import sqlite3
 import time
 from pathlib import Path
 
-from .policies import PersonalPosterior
+from typing import Callable
+
+from .policies import posterior_from_dict
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS profile (
@@ -67,15 +69,16 @@ class ProfileStore:
         self.db.close()
 
     # ------------------------------------------------------------------ posterior
-    def load(self, user: str, **prior_kw) -> PersonalPosterior:
+    def load(self, user: str, new: Callable[[], object]):
+        """The user's stored posterior, or ``new()`` (saved) for a new user."""
         row = self.db.execute("SELECT posterior FROM profile WHERE user_id=?", (user,)).fetchone()
         if row:
-            return PersonalPosterior.from_dict(json.loads(row[0]))
-        post = PersonalPosterior(**prior_kw)
+            return posterior_from_dict(json.loads(row[0]))
+        post = new()
         self.save(user, post)
         return post
 
-    def save(self, user: str, post: PersonalPosterior) -> None:
+    def save(self, user: str, post) -> None:
         now = time.time()
         self.db.execute(
             "INSERT INTO profile(user_id, created, updated, posterior) VALUES(?,?,?,?) "
@@ -138,5 +141,5 @@ class ProfileStore:
         data = json.loads(Path(path).read_text())
         user = data["user"]
         if data.get("posterior"):
-            self.save(user, PersonalPosterior.from_dict(data["posterior"]))
+            self.save(user, posterior_from_dict(data["posterior"]))
         return user
