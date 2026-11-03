@@ -82,6 +82,7 @@ def evaluate(
         for _, r in g.iterrows():
             a, b = int(round(r.start / hop)), int(round(r.end / hop))
             ctr = M.note_center(mo, a, b)
+            ctr0 = M.note_center(mc, a, b)  # the clean note, measured the same way: the floor
             r0, e0 = M.vibrato(mc[a:b], hop)
             r1, e1 = M.vibrato(mo[a:b], hop)
             rows.append(
@@ -89,6 +90,7 @@ def evaluate(
                     take=take, index=r["index"], route=route, highly_detuned=r.highly_detuned,
                     offset_cents=r.offset_cents, target=r.target_midi,
                     error_cents=100 * (ctr - r.target_midi) if not np.isnan(ctr) else np.nan,
+                    clean_error_cents=100 * (ctr0 - r.target_midi) if not np.isnan(ctr0) else np.nan,
                     vib_rate_clean=r0, vib_rate_out=r1, vib_extent_clean=e0, vib_extent_out=e1,
                     key_used=an.key.name if an.key else "", key_true=keys[take], rtf=res.rtf,
                     technique=tech.get(take, ""), target_in_key=int(r.target_midi) % 12 in snap_pcs,
@@ -146,6 +148,9 @@ def summarize(df: pd.DataFrame) -> dict:
         "median_abs_err_lt50": float(low.abs_err.median()),
         "share_within_25_lt50": float((low.abs_err <= 25).mean()),
         "median_abs_err_ge50": float(high.abs_err.median()) if len(high) else float("nan"),
+        # the same notes in the clean take, as the measuring tracker hears them: what a perfect
+        # corrector would score (the singer's own deviation plus measurement error)
+        "median_abs_clean_err_lt50": float(low.clean_error_cents.abs().median()) if "clean_error_cents" in low else float("nan"),
         "share_within_25_ge50": float((high.abs_err <= 25).mean()) if len(high) else float("nan"),
         "vibrato_notes": len(has_vib),
         "vibrato_rate_within_10pct": float(rate_ok.mean()) if len(has_vib) else float("nan"),

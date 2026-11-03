@@ -131,6 +131,8 @@ def test_corrector_eval_shards_merge_to_the_unsharded_result(corpus, tmp_path):
     # the corrector's own WORLD/PSOLA split is recorded per take and summarized
     assert 0 <= full["corrector_world_share"] <= 1
     assert merged["corrector_world_share"] == pytest.approx(full["corrector_world_share"])
+    # the clean notes are the floor: in tune by construction (within 20 cents of the target)
+    assert full["median_abs_clean_err_lt50"] <= 20
     run = json.loads((tmp_path / "merged" / "run.json").read_text())
     assert run["tracker"] == "yin" and run["measure_tracker"] == "pyin"
     with pytest.raises(ValueError):

@@ -28,7 +28,7 @@
 
 ## Settings that need calibrating with real data
 
-* `QualityConfig.mcd_threshold`: run `adaptitune calibrate` on clean development vocals. The default of 12 dB comes from synthetic voices.
+* `QualityConfig.mcd_threshold`: **calibrated** at 21.58 on the clean takes of the VocalSet corpus's 9 training singers (`scripts/calibrate_quality.py --tracker fcpe`, 15 takes per singer). With YIN finding the voiced segments it is 21.46, so the choice of tracker hardly matters. Recalibrate the same way if the app's tracker or sample rate changes.
 * `QualityConfig.hnr_db` (10 dB) and `min_voicing` (0.5): calibrate these on the labelled real recordings and report the share of segments that goes to each route.
 * The reward weights and the agent's population part: after the pilot, check the simulator's preference ranges against what pilot singers actually do, then retrain. The personal prior comes from the population's spread, so it is re-estimated in the same run.
 * `metrics.MCD_RISE_FULL`, `JUMP_RATE_FULL` and `HNR_DROP_FULL`: these scale the naturalness indicators. Check them against pilot naturalness ratings.

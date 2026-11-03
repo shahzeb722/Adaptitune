@@ -8,7 +8,8 @@ Parselmouth) when any of these holds:
 * median harmonics-to-noise ratio below ``hnr_db`` (10 dB),
 * mean tracker voicing probability below ``min_voicing`` (0.5),
 * WORLD copy-synthesis mel-cepstral distortion above ``mcd_threshold`` (95th percentile on
-  clean development vocals, calibrated by ``scripts/calibrate_quality.py``).
+  clean vocals of the O1 corpus's training singers, calibrated by
+  ``scripts/calibrate_quality.py``; see ``QualityConfig``).
 
 Segments with voicing below 0.2 are left untouched by the planner already. All thresholds are
 starting values and are exposed so they can be calibrated.
@@ -31,7 +32,11 @@ FADE_S = 0.01
 class QualityConfig:
     hnr_db: float = 10.0
     min_voicing: float = 0.5
-    mcd_threshold: float = 12.0  # dB; replace with the calibrated 95th percentile (scripts/calibrate_quality.py)
+    # 95th percentile of WORLD copy-synthesis MCD over the voiced segments of 135 clean takes
+    # (15 per singer) from the 9 training singers of the VocalSet corpus, with FCPE finding the
+    # segments (docs/results/o3/quality_calibration_fcpe.json; YIN gives 21.46). The units are
+    # those of metrics.mel_cepstral_distortion, which are not comparable with SPTK-based MCD.
+    mcd_threshold: float = 21.58
     force: str | None = None  # "world" | "psola" to bypass routing (benchmarks, detuning)
 
 
