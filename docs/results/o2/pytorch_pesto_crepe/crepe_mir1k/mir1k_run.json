@@ -1,0 +1,230 @@
+{
+  "dataset": "mir1k",
+  "label": "mir1k",
+  "root": "data/raw",
+  "limit": null,
+  "noise_snr": null,
+  "mix_snr": null,
+  "trackers": [
+    "crepe"
+  ],
+  "search_range_hz": [
+    32.7,
+    1975.5
+  ],
+  "segment_s": 30.0,
+  "segment_context_s": 1.5,
+  "shard": null,
+  "failures": {},
+  "machine": {
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.80GHz",
+    "logical_cores": 4,
+    "threads": 1,
+    "platform": "Linux-6.18.44-fc-v230-x86_64-with-glibc2.39",
+    "python": "3.11.18",
+    "git_commit": "ceb5f3435331f9b1cc4075fa44b435e9de0ffc5e",
+    "time": "2026-11-03T10:36:00+0000",
+    "physical_cores": 4,
+    "ram_gb": 15.7,
+    "versions": {
+      "numpy": "2.4.6",
+      "scipy": "1.17.1",
+      "librosa": "0.11.0",
+      "mir_eval": "0.8.2",
+      "torch": "2.15.0",
+      "onnxruntime": "1.31.1",
+      "pesto-pitch": "2.0.1",
+      "torchfcpe": "0.0.4",
+      "torchcrepe": "0.0.24"
+    }
+  },
+  "merged_from": [
+    "results/mir1k_jobs/crepe_0",
+    "results/mir1k_jobs/crepe_1",
+    "results/mir1k_jobs/crepe_2",
+    "results/mir1k_jobs/crepe_3",
+    "results/mir1k_jobs/crepe_4",
+    "results/mir1k_jobs/crepe_5",
+    "results/mir1k_jobs/crepe_6",
+    "results/mir1k_jobs/crepe_7"
+  ],
+  "shards": 8,
+  "machines": [
+    {
+      "cpu": "Intel(R) Xeon(R) Processor @ 2.80GHz",
+      "logical_cores": 4,
+      "threads": 1,
+      "platform": "Linux-6.18.44-fc-v230-x86_64-with-glibc2.39",
+      "python": "3.11.18",
+      "git_commit": "ceb5f3435331f9b1cc4075fa44b435e9de0ffc5e",
+      "time": "2026-11-03T10:36:00+0000",
+      "physical_cores": 4,
+      "ram_gb": 15.7,
+      "versions": {
+        "numpy": "2.4.6",
+        "scipy": "1.17.1",
+        "librosa": "0.11.0",
+        "mir_eval": "0.8.2",
+        "torch": "2.15.0",
+        "onnxruntime": "1.31.1",
+        "pesto-pitch": "2.0.1",
+        "torchfcpe": "0.0.4",
+        "torchcrepe": "0.0.24"
+      }
+    },
+    {
+      "cpu": "Intel(R) Xeon(R) Processor @ 2.80GHz",
+      "logical_cores": 4,
+      "threads": 1,
+      "platform": "Linux-6.18.44-fc-v230-x86_64-with-glibc2.39",
+      "python": "3.11.18",
+      "git_commit": "ceb5f3435331f9b1cc4075fa44b435e9de0ffc5e",
+      "time": "2026-11-03T11:03:38+0000",
+      "physical_cores": 4,
+      "ram_gb": 15.7,
+      "versions": {
+        "numpy": "2.4.6",
+        "scipy": "1.17.1",
+        "librosa": "0.11.0",
+        "mir_eval": "0.8.2",
+        "torch": "2.15.0",
+        "onnxruntime": "1.31.1",
+        "pesto-pitch": "2.0.1",
+        "torchfcpe": "0.0.4",
+        "torchcrepe": "0.0.24"
+      }
+    },
+    {
+      "cpu": "Intel(R) Xeon(R) Processor @ 2.80GHz",
+      "logical_cores": 4,
+      "threads": 1,
+      "platform": "Linux-6.18.44-fc-v230-x86_64-with-glibc2.39",
+      "python": "3.11.18",
+      "git_commit": "cad45a9027840223670eac8524a4073b4aab1bd7",
+      "time": "2026-11-03T11:37:32+0000",
+      "physical_cores": 4,
+      "ram_gb": 15.7,
+      "versions": {
+        "numpy": "2.4.6",
+        "scipy": "1.17.1",
+        "librosa": "0.11.0",
+        "mir_eval": "0.8.2",
+        "torch": "2.15.0",
+        "onnxruntime": "1.31.1",
+        "pesto-pitch": "2.0.1",
+        "torchfcpe": "0.0.4",
+        "torchcrepe": "0.0.24"
+      }
+    },
+    {
+      "cpu": "Intel(R) Xeon(R) Processor @ 2.80GHz",
+      "logical_cores": 4,
+      "threads": 1,
+      "platform": "Linux-6.18.44-fc-v230-x86_64-with-glibc2.39",
+      "python": "3.11.18",
+      "git_commit": "2a026690fc5def04814f74bec514472a5af3cac1",
+      "time": "2026-11-03T19:45:25+0000",
+      "physical_cores": 4,
+      "ram_gb": 15.7,
+      "versions": {
+        "numpy": "2.4.6",
+        "scipy": "1.17.1",
+        "librosa": "0.11.0",
+        "mir_eval": "0.8.2",
+        "torch": "2.15.0",
+        "onnxruntime": "1.31.1",
+        "pesto-pitch": "2.0.1",
+        "torchfcpe": "0.0.4",
+        "torchcrepe": "0.0.24"
+      }
+    },
+    {
+      "cpu": "Intel(R) Xeon(R) Processor @ 2.80GHz",
+      "logical_cores": 4,
+      "threads": 1,
+      "platform": "Linux-6.18.44-fc-v230-x86_64-with-glibc2.39",
+      "python": "3.11.18",
+      "git_commit": "2a026690fc5def04814f74bec514472a5af3cac1",
+      "time": "2026-11-03T19:46:42+0000",
+      "physical_cores": 4,
+      "ram_gb": 15.7,
+      "versions": {
+        "numpy": "2.4.6",
+        "scipy": "1.17.1",
+        "librosa": "0.11.0",
+        "mir_eval": "0.8.2",
+        "torch": "2.15.0",
+        "onnxruntime": "1.31.1",
+        "pesto-pitch": "2.0.1",
+        "torchfcpe": "0.0.4",
+        "torchcrepe": "0.0.24"
+      }
+    },
+    {
+      "cpu": "Intel(R) Xeon(R) Processor @ 2.80GHz",
+      "logical_cores": 4,
+      "threads": 1,
+      "platform": "Linux-6.18.44-fc-v230-x86_64-with-glibc2.39",
+      "python": "3.11.18",
+      "git_commit": "2a026690fc5def04814f74bec514472a5af3cac1",
+      "time": "2026-11-03T19:48:23+0000",
+      "physical_cores": 4,
+      "ram_gb": 15.7,
+      "versions": {
+        "numpy": "2.4.6",
+        "scipy": "1.17.1",
+        "librosa": "0.11.0",
+        "mir_eval": "0.8.2",
+        "torch": "2.15.0",
+        "onnxruntime": "1.31.1",
+        "pesto-pitch": "2.0.1",
+        "torchfcpe": "0.0.4",
+        "torchcrepe": "0.0.24"
+      }
+    },
+    {
+      "cpu": "Intel(R) Xeon(R) Processor @ 2.80GHz",
+      "logical_cores": 4,
+      "threads": 1,
+      "platform": "Linux-6.18.44-fc-v230-x86_64-with-glibc2.39",
+      "python": "3.11.18",
+      "git_commit": "2a026690fc5def04814f74bec514472a5af3cac1",
+      "time": "2026-11-03T19:49:17+0000",
+      "physical_cores": 4,
+      "ram_gb": 15.7,
+      "versions": {
+        "numpy": "2.4.6",
+        "scipy": "1.17.1",
+        "librosa": "0.11.0",
+        "mir_eval": "0.8.2",
+        "torch": "2.15.0",
+        "onnxruntime": "1.31.1",
+        "pesto-pitch": "2.0.1",
+        "torchfcpe": "0.0.4",
+        "torchcrepe": "0.0.24"
+      }
+    },
+    {
+      "cpu": "Intel(R) Xeon(R) Processor @ 2.80GHz",
+      "logical_cores": 4,
+      "threads": 1,
+      "platform": "Linux-6.18.44-fc-v230-x86_64-with-glibc2.39",
+      "python": "3.11.18",
+      "git_commit": "2a026690fc5def04814f74bec514472a5af3cac1",
+      "time": "2026-11-03T19:57:18+0000",
+      "physical_cores": 4,
+      "ram_gb": 15.7,
+      "versions": {
+        "numpy": "2.4.6",
+        "scipy": "1.17.1",
+        "librosa": "0.11.0",
+        "mir_eval": "0.8.2",
+        "torch": "2.15.0",
+        "onnxruntime": "1.31.1",
+        "pesto-pitch": "2.0.1",
+        "torchfcpe": "0.0.4",
+        "torchcrepe": "0.0.24"
+      }
+    }
+  ]
+}
