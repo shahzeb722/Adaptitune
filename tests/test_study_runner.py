@@ -140,6 +140,7 @@ def test_export_feeds_the_analysis_and_withdrawal_deletes(study, tmp_path):
     n = R.withdraw("P10", store, root)
     assert n > 0 and not list((root / "sessions").glob("P10_*")) and not list((root / "takes").glob("P10_*"))
     assert store.last_manual("P10") is None
+    assert b"P10" not in store.path.read_bytes()  # not even in the database file's free pages
 
 
 def test_time_to_a_kept_take_counts_a_singer_who_kept_nothing_as_tuning_by_hand():

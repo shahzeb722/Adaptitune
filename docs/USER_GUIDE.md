@@ -30,6 +30,17 @@ To build it yourself instead, run `packaging\build_windows.bat` from the reposit
 
 Everything the app learns is in one file, `C:\Users\<you>\.adaptitune\profile.sqlite`. **Help → Where my data is stored** opens that folder. Corrected recordings are saved only where you save them. Set the `ADAPTITUNE_HOME` environment variable to keep the profile somewhere else.
 
+## Run a study session (O6)
+
+**Study → Run a study session…** opens the window for one session of the user study. Use it only once the study has ethics approval, and follow [study/session_script.md](study/session_script.md). The plan is [O6_PROTOCOL.md](O6_PROTOCOL.md).
+
+1. The researcher types the participant's code (such as P07, never a name). The window shows which session is next, "Session 3 of 5". Tick the consent box, then record or import the participant's three takes. **Start session** becomes available once all three are in.
+2. The participant plays each of twelve versions, answers *keep or discard* and *how natural* (1–5), and presses **Next**. There is a break after the sixth.
+3. The participant sets the correction by hand for up to five minutes, presses **I'm happy with this setting**, and rates it.
+4. The last page gives the researcher a one-line summary for the study log.
+
+The study keeps its own files, apart from your own profile, in `C:\Users\<you>\.adaptitune\study\`. **Export study data…** writes the CSV files for the analysis (`adaptitune study-analyze trials.csv --manual manual.csv` in a checkout). **Withdraw a participant…** deletes everything kept about one code. Closing the window in the middle of a session asks first. An unfinished session is kept apart and left out of the analysis.
+
 ## Check the app on your laptop
 
 These checks are how O5 is measured on the reference laptop. Each one shows PASS or FAIL and keeps its report in the `checks` folder next to your profile; **Save report…** puts a copy wherever you like, for example to send it to the team.

@@ -1,6 +1,6 @@
 # Results
 
-Status on 4 November 2026. O1, both parts of O2 and O3 now run on real data. O2's key test uses the Children's Song Dataset in place of the hand labels, because nobody was available to label keys by ear. O4 and O6 are simulations by design. The O5 app is built for Windows in CI and passes its own checks there, but its speed has to be measured on the reference laptop. The earlier synthetic-only results are kept in the appendix as code checks.
+Status on 4 November 2026. O1, both parts of O2 and O3 now run on real data. O2's key test uses the Children's Song Dataset in place of the hand labels, because nobody was available to label keys by ear. O4 is a simulation by design, and so is O6 until the user study, which needs ethics approval first. The O5 app is built for Windows in CI and passes its own checks there, but its speed has to be measured on the reference laptop. The earlier synthetic-only results are kept in the appendix as code checks.
 
 | Objective | Status | Main number |
 |---|---|---|
@@ -10,7 +10,7 @@ Status on 4 November 2026. O1, both parts of O2 and O3 now run on real data. O2'
 | O3 correction | **Met** (VocalSet test singers) | Median error 7.7 cents on notes detuned by under 50 cents (target 25); the median vibrato note keeps its rate within 2% and 97% of its extent |
 | O4 personalization | **Met** in simulation | Thompson sampling reaches 91.4% of the oracle's reward after 20 interactions |
 | O5 offline app | Built for Windows and checked there; laptop run pending | Every feature passes in the packaged Windows app with the network blocked; the full correction path runs at 0.22× real time on real singing on the cloud VM (target 0.5 on the laptop) |
-| O6 user study | Design ready | Power simulation below |
+| O6 user study | Ready to run once ethics approval comes (application February 2027). Dry run done with simulated participants on real singing | Dry run: C3 beats C1 by 62.9 points and passes on time and naturalness, but trails the hand-tuned C4 by 12.6 points (target 10). That part depends on how well people tune by hand, which only the study can show |
 
 **Machine.** The real-data runs used a shared 4-core Intel Xeon @ 2.8 GHz cloud VM, CPU only, with several jobs running side by side at 1 thread each. Accuracy does not depend on that, but speed does, so the speed numbers below are not the reference laptop's. `scripts/o2_laptop_speed.py` measures them there.
 
@@ -227,9 +227,67 @@ The workflow removes PyTorch from the machine after the build, runs both checks 
 
 **What driving the app found.** The unit tests passed while the app itself did not work. Every button that runs in the background (import, correct, A/B, apply) stayed on "Analysing…": PySide discards a job's finished signal when nothing references the job, so the window now holds each running job. Drawing a long take's pitch curve crashed the app with "deallocating None", because PySide6 6.12.0 under Python 3.11 drops a reference to `None` on every call that returns nothing; PySide6 is pinned below 6.12. The packaged app looked for its FCPE model next to the exe, where PyInstaller 6 no longer puts data files, so it fell back to pYIN, which is too slow for NFR2; the self-test now fails a packaged build that does not run the bundled FCPE. Smaller fixes: Record with no microphone left the button stuck, and the import dialog offered m4a, which the bundled libsndfile cannot read. Each fix has a test in `tests/test_app.py`.
 
-## O6: study design (power simulation)
+## O6: user study (dry run and power)
 
-These numbers detect a 15-point acceptance gain (C3 vs C1, sessions 3–5; 95% CI excludes 0). They assume a 45% base acceptance and a singer random effect with sd 0.8 on the log-odds scale.
+**The study is ready to run, and nobody has taken part.** It needs ethics approval first: the application is due in February 2027, and the sessions are planned for October and November 2027. The plan, fixed today before anyone takes part, is [O6_PROTOCOL.md](O6_PROTOCOL.md). The information sheet, consent form, session script, recruitment texts and data management plan are drafts in `docs/study/`. The app runs each session under **Study → Run a study session…**, and `adaptitune.study.runner` enforces the protocol: three takes, twelve blind versions with two repeats, a break, the hand-tuning task, and C4 from session 3 on.
+
+### Dry run: the whole study with simulated participants on real singing
+
+`scripts/o6_dry_run.py` ran all five sessions for 15 simulated participants through the same runner and analysis as the real study (commit ac6466d, 4 November, 4-core cloud VM, 5.3 minutes). Records are in `docs/results/o6/dry_run/`.
+
+* **Real:** the singing, the corrections and everything measured on them. Each participant is one MIR-1K singer, the 15 with the most clips, and each session uses three new clips of that singer. Every version was corrected by the app's pipeline (FCPE through ONNX Runtime, then WORLD or PSOLA). The schedule, the counterbalancing, the repeats, the agent's learning, the files, the export and the analysis are the study's own code.
+* **Simulated:** the people. Keep or discard comes from the O4 simulator. Each participant follows one of its three preference models in turn, with an ideal setting placed around what the population wants for that singer's measured singing, drift between sessions and fatigue within each. The naturalness rating is the version's measured naturalness score plus noise. The hand-tuned setting is the participant's ideal plus noise (standard deviation 0.06 on each normalised setting). Judging times (6–20 s) and tuning times (about 160 s) are invented.
+
+So **the acceptance numbers follow the simulator's assumptions and say nothing about people.** The dry run shows that the study runs end to end and that the analysis works on its export. It also shows what the result depends on.
+
+| O6 part (sessions 3–5) | Dry run (95% CI) | Target | |
+|---|---|---|---|
+| Acceptance C3 − C1 | **+62.9 points** (52.2 to 73.4) | ≥ +15 | met |
+| Acceptance C4 − C3 | **+12.6 points** (−2.0 to 26.7) | ≤ +10 | missed |
+| Time to a kept take | **22.8 s** with the agent against **162.8 s** by hand: 140 s saved (127 to 153) | less with the agent | met, on invented times |
+| Naturalness C3 − C1 | **+0.27** points, p < 0.001 (one-sided Wilcoxon against −0.5, 15 singers) | non-inferior at 0.5 | met |
+
+Acceptance by session (keep rate of unflagged judgments):
+
+| Session | C1 Fixed | C2 Default | C3 Agent | C4 Saved by hand | Agent's distance to the saved setting |
+|---|---|---|---|---|---|
+| 1 | 4.1% | 42.6% | 37.1% | – | 0.66 |
+| 2 | 6.0% | 43.8% | 45.2% | – | 0.54 |
+| 3 | 0.0% | 38.7% | 62.7% | 76.7% | 0.40 |
+| 4 | 6.1% | 47.2% | 79.0% | 76.7% | 0.37 |
+| 5 | 3.2% | 40.6% | 64.3% | 87.9% | 0.36 |
+
+The distance is between normalised settings, from each C3 version to the setting the singer saved by hand in that session.
+
+Measured on the real corrected audio (originals only, all sessions):
+
+| Condition | Versions | Pitch error before → after (median cents) | In key | Naturalness score | Naturalness rating (simulated) |
+|---|---|---|---|---|---|
+| C1 Fixed | 180 | 31.6 → **4.0** | **91.7%** | 0.661 | 3.62 |
+| C2 Default | 180 | 31.7 → 15.2 | 70.1% | 0.732 | 3.95 |
+| C3 Agent | 300 | 29.4 → 17.2 | 67.1% | **0.735** | 3.90 |
+| C4 Saved by hand | 90 | 27.6 → 15.4 | 69.4% | 0.725 | 3.82 |
+
+What the dry run shows:
+
+* **The agent learns across sessions.** C3's acceptance rises from 37% in session 1 to 63–79% in sessions 3–5, while C2, the default, stays at 39–47%. The distance from the agent's choices to the singer's own saved setting halves, from 0.66 to 0.36. By session 3 the agent has learned from 8 judgments, and by the end from 20.
+* **C4 − C3 is the part at risk, and it depends on how well people tune by hand.** Here the hand-tuned setting lands close to each singer's ideal (noise 0.06), so C4 is accepted 81% of the time. The same run with less accurate hand tuning judges every C1, C2 and C3 version identically. Only C4 changes, and with it which sessions the consistency flag catches:
+
+  | Hand-tuning noise | C4 acceptance | C4 − C3 (95% CI) | O6 |
+  |---|---|---|---|
+  | 0.06 (as above) | 80.6% | +12.6 (−2.0 to 26.7) | missed |
+  | 0.15 | 67.0% | −1.5 (−16.1 to 13.0) | met |
+  | 0.25 | 44.2% | −22.1 (−34.0 to −10.0) | met |
+
+  How close people get to their own ideal in five minutes is exactly what the study measures, so this part is open until the real data come in. With 20 judgments over the five sessions, the agent is still learning in sessions 3–5: in O4's simulation its best guess earns 87% of the oracle's reward after 8 interactions and 91% after 20 (`results/agent_h60/steps.csv.gz`).
+* **C1 is almost never kept (3%),** because the simulator's singers rarely want hard auto-tune. That makes C3 − C1 easy here. Real singers who like the hard, robotic sound would narrow it.
+* **The measured audio shows the trade-off that the study tests.** C1 puts the most notes in key (92%, 4 cents of error left) but measures as the least natural (0.661). The agent leaves more of the singer's own pitch (17 cents) and measures as the most natural (0.735). The simulated naturalness ratings come from that score, so the naturalness pass here reflects the pipeline's measurement, not anyone's ears.
+* **Flagging works, and it bites.** With two repeats per session, one disagreement flags the rest of the session. That flagged 12.3% of the judgments here, more often in later sessions as the simulated fatigue builds. With the flagged judgments kept in, C3 − C1 is +61.1 points and C4 − C3 is +12.4. The analysis reports both.
+* **The agent's choices are as easy to keep for all three kinds of singer** (C3: 65%, 79% and 64% for ideal-point, logistic and threshold singers in sessions 3–5). C4 does best for ideal-point singers (97%), whose acceptance falls off sharply away from their ideal, which a hand-tuned setting near the ideal hits.
+
+### Power
+
+These numbers are for detecting a 15-point acceptance gain (C3 vs C1, sessions 3–5), counted as detected when the 95% CI excludes 0. They assume a 45% base acceptance and a singer random effect with sd 0.8 on the log-odds scale.
 
 | Singers | 10 | 12 | 15 | 20 |
 |---|---|---|---|---|

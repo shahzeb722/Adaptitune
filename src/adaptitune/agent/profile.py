@@ -62,6 +62,8 @@ class ProfileStore:
     def __init__(self, path: str | Path | None = None):
         self.path = Path(path) if path else default_path()
         self.db = sqlite3.connect(str(self.path))
+        # deleted rows are overwritten, whatever the platform's SQLite does by default (FR7, withdrawal)
+        self.db.execute("PRAGMA secure_delete=ON")
         self.db.executescript(SCHEMA)
         self.db.commit()
 
@@ -121,6 +123,7 @@ class ProfileStore:
         for t in ("profile", "history", "manual"):
             self.db.execute(f"DELETE FROM {t} WHERE user_id=?", (user,))
         self.db.commit()
+        self.db.execute("VACUUM")  # rewrite the file, so the deleted rows do not linger in free pages
 
     def export(self, user: str, path: str | Path) -> Path:
         row = self.db.execute("SELECT posterior, created, updated FROM profile WHERE user_id=?", (user,)).fetchone()

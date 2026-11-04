@@ -23,7 +23,7 @@ AdaptiTune corrects a recorded vocal the way classic auto-tune does: it detects 
 ```bash
 python3.11 -m venv .venv && source .venv/bin/activate      # Windows: .venv\Scripts\activate
 pip install -e ".[app,dev,study]"
-pytest                                                     # about 130 tests, 5-10 minutes
+pytest                                                     # about 140 tests, 5-10 minutes
 adaptitune-app                                             # the desktop app
 adaptitune correct my_take.wav fixed.wav --key "A minor"   # one file from the command line
 ```
@@ -44,10 +44,10 @@ The app's pitch tracker is **FCPE**, which the O2 benchmark chose. It runs FCPE'
 | 5.4 Simulated singers (3 models, drift, fatigue) | `adaptitune/agent/simulator.py`, `experiment.py` | O4 `adaptitune simulate` |
 | 5.5 Offline deployment, ONNX, SQLite profile | `adaptitune/app/`, `agent/profile.py`, `scripts/export_onnx.py` | O5 `adaptitune rtf` |
 | 5.6 FR1–FR7, NFR1–NFR4 | `adaptitune/app/main.py`, `agent/session.py` | `tests/test_session_study.py`, `tests/test_app.py` |
-| 5.7 Study protocol and analysis | `adaptitune/study/` | O6 `adaptitune study-plan`, `study-analyze` |
+| 5.7 Study protocol, session runner and analysis | `adaptitune/study/`, `app/study.py`, `scripts/o6_dry_run.py` | O6 `adaptitune study-plan`, `study-analyze`, [docs/O6_PROTOCOL.md](docs/O6_PROTOCOL.md) |
 | Metrics (RPA/RCA, cents error, vibrato, naturalness) | `adaptitune/metrics.py` | |
 
-Results so far, and what still needs real data, are in [docs/RESULTS.md](docs/RESULTS.md). The O1 corpus datasheet is [docs/O1_CORPUS.md](docs/O1_CORPUS.md), and the O2 method, fixed before any real-data run, is [docs/O2_PROTOCOL.md](docs/O2_PROTOCOL.md). The architecture notes and a guide to who owns what are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). A code knowledge graph made with graphify is in `graphify-out/` (open `graph.html`).
+Results so far, and what still needs real data, are in [docs/RESULTS.md](docs/RESULTS.md). The O1 corpus datasheet is [docs/O1_CORPUS.md](docs/O1_CORPUS.md), the O2 method, fixed before any real-data run, is [docs/O2_PROTOCOL.md](docs/O2_PROTOCOL.md), and the O6 study plan, fixed before anyone takes part, is [docs/O6_PROTOCOL.md](docs/O6_PROTOCOL.md). The architecture notes and a guide to who owns what are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). A code knowledge graph made with graphify is in `graphify-out/` (open `graph.html`).
 
 ## Using the real datasets
 
@@ -87,6 +87,7 @@ adaptitune eval-corrector data/corpus --tracker fcpe --measure-tracker pyin # O3
 * The pitch view and the table show how far each note was off before and after (FR6).
 * The profile can be reset or exported (FR7). It lives in `~/.adaptitune/profile.sqlite`; set `ADAPTITUNE_HOME` to move it.
 * Recording needs `sounddevice` and a microphone, while importing works without them.
+* **Study → Run a study session…** runs one session of the O6 user study: three takes, twelve blind versions with keep and naturalness questions, a break, and the hand-tuning task. The plan, consent form and session script are in [docs/O6_PROTOCOL.md](docs/O6_PROTOCOL.md) and `docs/study/`. `scripts/o6_dry_run.py` runs the whole study through the same code with simulated participants judging real MIR-1K singing.
 * **Help → Check this installation** runs every feature through the window with the network blocked, in a throwaway profile. **Help → Speed test** times the whole correction path on the MIR-1K folder (O5). Both keep a JSON report, and both run from the command line: `AdaptiTune.exe --self-test`, `AdaptiTune.exe --speed-test E:\FYP\MIR1K` (in a checkout, `python -m adaptitune.app.launch` in place of the exe).
 
 The Windows app is built on every push by `.github/workflows/windows-app.yml`, which also runs both checks on the packaged exe. Download it from the run's **AdaptiTune-windows** artifact, or build it with `packaging\build_windows.bat` (PyInstaller, one-folder build). [docs/USER_GUIDE.md](docs/USER_GUIDE.md) covers installing it, each feature, and the laptop checks.

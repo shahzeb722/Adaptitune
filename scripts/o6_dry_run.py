@@ -16,8 +16,9 @@ error, in-key accuracy, naturalness score) are measured on the real audio of eve
 do not depend on the simulated people.
 
 Only the hand-tuned setting draws on ``--manual-noise``, and every simulated singer makes the same
-number of random draws whatever it is, so runs that differ only in it judge C1, C2 and C3
-identically: only C4 changes.
+number of random draws whatever it is, so runs that differ only in it judge every C1, C2 and C3
+version identically. Only the C4 judgments change, and with them the consistency flag of a
+session that repeats a C4 version.
 
     python scripts/o6_dry_run.py data/raw/MIR-1K --participants 15 --out results/o6_dry_run --workers 4
     python scripts/o6_dry_run.py data/raw/MIR-1K --manual-noise 0.15 --out results/o6_dry_run_noise015

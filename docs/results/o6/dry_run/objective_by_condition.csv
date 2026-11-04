@@ -1,0 +1,5 @@
+condition,versions,before_cents,after_cents,in_key_accuracy,naturalness_score,vibrato_penalty,naturalness_rating
+C1,180,31.55,4.0,0.917,0.661,0.051,3.617
+C2,180,31.7,15.15,0.701,0.732,0.0,3.95
+C3,300,29.4,17.2,0.671,0.735,0.001,3.9
+C4,90,27.55,15.4,0.694,0.725,0.001,3.822
