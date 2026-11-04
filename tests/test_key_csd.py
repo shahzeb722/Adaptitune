@@ -3,6 +3,9 @@ keys, the excerpts and a full run on a fake CSD folder of synthetic singing."""
 
 import json
 import struct
+import subprocess
+import sys
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -12,6 +15,7 @@ from adaptitune.music import Key
 
 TWINKLE = [60, 60, 67, 67, 69, 69, 67, 65, 65, 64, 64, 62, 62, 60]  # C major, ends on C
 MINOR = [69, 71, 72, 74, 76, 74, 72, 71, 69, 72, 71, 69]  # A minor with C natural, ends on A
+NO_THIRD = [60, 67, 65, 62, 60, 67, 62, 60]  # no third above the last note: no reference
 QUARTER_S, LEAD_S, GAP_S = 0.6, 0.3, 0.06
 
 
@@ -58,6 +62,7 @@ def test_reference_key_is_the_last_note_and_the_third():
     assert reference_key(notes_of(TWINKLE)) == Key(0, "major")
     assert reference_key(notes_of(MINOR)) == Key(9, "minor")
     assert reference_key(notes_of([p + 3 for p in MINOR])) == Key(0, "minor")
+    assert reference_key(notes_of(NO_THIRD)) is None
     assert ks_key(notes_of(TWINKLE)) == Key(0, "major")
 
 
@@ -81,6 +86,7 @@ def fake_csd(tmp_path_factory):
 
     root = tmp_path_factory.mktemp("csd") / "CSD"
     songs = {"english/en001a": TWINKLE * 2, "english/en001b": [p + 2 for p in TWINKLE * 2],
+             "english/en002a": NO_THIRD, "english/en002b": [p + 5 for p in NO_THIRD],
              "korean/kr001a": MINOR * 2, "korean/kr001b": [p + 3 for p in MINOR * 2]}
     for i, (name, pitches) in enumerate(songs.items()):
         lang, rec = name.split("/")
@@ -94,17 +100,38 @@ def test_finds_recordings_and_their_midi(fake_csd):
     items = find_csd(fake_csd)
     assert [(i["recording"], i["song"], i["version"], i["language"]) for i in items] == [
         ("en001a", "en001", "a", "english"), ("en001b", "en001", "b", "english"),
+        ("en002a", "en002", "a", "english"), ("en002b", "en002", "b", "english"),
         ("kr001a", "kr001", "a", "korean"), ("kr001b", "kr001", "b", "korean")]
 
 
-def test_csd_run_scores_every_recording(fake_csd, tmp_path):
-    s = evaluate_csd(fake_csd, tmp_path / "out", tracker="yin")
-    assert s["recordings"] == 4 and s["songs"] == 2 and s["no_reference"] == 0
+@pytest.fixture(scope="module")
+def csd_run(fake_csd, tmp_path_factory):
+    out = tmp_path_factory.mktemp("run")
+    return evaluate_csd(fake_csd, out, tracker="yin"), out
+
+
+def test_csd_run_scores_every_recording(csd_run):
+    s, out = csd_run
+    assert s["recordings"] == 6 and s["songs"] == 3 and s["no_reference"] == 2  # counted, not scored
     assert s["checks"]["song_pairs"] == 2 and s["checks"]["pairs_consistent_with_transposition"] == 2
     assert s["checks"]["midi_more_than_half_a_semitone_from_heard_pitch"] == 0
     assert s["excerpt"]["n"] == 4 and s["whole"]["n"] == 4
     assert s["whole"]["same_scale"] == 1.0  # clean synthetic singing: right scale on every song
     assert set(s["whole"]["by_language"]) == {"english", "korean"}
-    assert json.loads((tmp_path / "out" / "summary.json").read_text())["recordings"] == 4
-    rows = (tmp_path / "out" / "per_recording.csv").read_text().splitlines()
-    assert len(rows) == 5 and "C major" in rows[1] and "A minor" in rows[3]
+    assert json.loads((out / "summary.json").read_text())["recordings"] == 6
+    rows = (out / "per_recording.csv").read_text().splitlines()
+    assert len(rows) == 7 and "C major" in rows[1] and "A minor" in rows[5]
+
+
+def test_miss_audit_checks_the_minor_references(fake_csd, csd_run, tmp_path):
+    """scripts/csd_misses.py: a true minor melody stays inside its minor key and leaves the major
+    key a major third below (MINOR uses B, which F major lacks)."""
+    script = Path(__file__).resolve().parents[1] / "scripts" / "csd_misses.py"
+    subprocess.run([sys.executable, str(script), str(csd_run[1]), str(fake_csd), "--out", str(tmp_path / "m.json")],
+                   check=True, capture_output=True)
+    res = json.loads((tmp_path / "m.json").read_text())
+    assert res["scored"] == 4
+    minor = {m["recording"]: m for m in res["minor_references"]}
+    assert set(minor) == {"kr001a", "kr001b"}
+    assert minor["kr001a"]["reference"] == "A minor" and minor["kr001a"]["major_key_below"] == "F major"
+    assert all(m["share_outside_reference_minor"] == 0 and m["share_inside_major_key_below"] < 1 for m in minor.values())

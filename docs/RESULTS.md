@@ -1,12 +1,12 @@
 # Results
 
-Status on 3 November 2026. O1, O2's tracker benchmark and O3 now run on the real datasets. O2's key result still uses real melodies rendered as synthetic singing, because the hand-labelled excerpts are not back yet. O4 and O6 are simulations by design, and O5's speed has to be measured on the reference laptop. The earlier synthetic-only results are kept in the appendix as code checks.
+Status on 4 November 2026. O1, both parts of O2 and O3 now run on real data. O2's key test uses the Children's Song Dataset in place of the hand labels, because nobody was available to label keys by ear. O4 and O6 are simulations by design, and O5's speed has to be measured on the reference laptop. The earlier synthetic-only results are kept in the appendix as code checks.
 
 | Objective | Status | Main number |
 |---|---|---|
 | O1 evaluation corpus | **Met** (VocalSet) | 2.20 h of unique test audio from 9 singers not used in development; 99.5% of kept offsets recovered within 10 cents by a second tracker |
 | O2 pitch trackers | **Met** (MIR-1K, MDB-stem-synth); the laptop speeds still have to confirm the choice | 4 trackers on both sets; the rule chooses FCPE, with RPA 0.941 on MDB-stem-synth (target 0.90) |
-| O2 key estimation | Waiting for the Children's Song Dataset, which replaces the hand labels | 73.8% exact on amateur-like Essen excerpts (target 75%) |
+| O2 key estimation | **Met** on the Children's Song Dataset, which replaced the hand labels. One professional singer, so it is easier than amateur singing | 86.9% exact on excerpts that stop before each song's last note (target 75%; 95% CI 80.3–92.9, resampling songs) |
 | O3 correction | **Met** (VocalSet test singers) | Median error 7.7 cents on notes detuned by under 50 cents (target 25); the median vibrato note keeps its rate within 2% and 97% of its extent |
 | O4 personalization | **Met** in simulation | Thompson sampling reaches 91.4% of the oracle's reward after 20 interactions |
 | O5 offline app | Laptop run pending | The full correction path runs at 0.22× real time on real singing on the cloud VM (target 0.5 on the laptop) |
@@ -49,9 +49,27 @@ Method, fixed before any real-data run: [O2_PROTOCOL.md](O2_PROTOCOL.md). MIR-1K
 
 ## O2: key estimation
 
-**Not scored yet.** O2's key criterion is at least 75% exact on about 100 hand-labelled excerpts, each labelled separately by two people. Nobody with the ear to label keys was available, so the test moves to the Children's Song Dataset, whose keys are fixed by its own MIDI notes ([O2_PROTOCOL.md, B4](O2_PROTOCOL.md#b4-replacement-for-the-hand-labels-the-childrens-song-dataset-4-november-2026), written before the data arrived). It runs once the dataset is downloaded; Zenodo is blocked from the cloud machine. Until then, the evidence is the Essen folksong collection: real melodies, rendered as synthetic singing.
+**Met on the Children's Song Dataset (CSD), which replaced the hand labels.** O2's key criterion was at least 75% exact on about 100 excerpts labelled by two people. Nobody with the ear to label keys was available, so the test moved to CSD: 50 Korean and 50 English children's songs, each sung in two keys by one professional singer, with MIDI notes aligned by hand. Each recording's reference key comes from those notes: the last note gives the tonic, and the third above it gives the mode. The method was committed before the data arrived ([O2_PROTOCOL.md, B4](O2_PROTOCOL.md#b4-replacement-for-the-hand-labels-the-childrens-song-dataset-4-november-2026)). The app's own path, FCPE through ONNX Runtime and then the key estimator, named the exact key on **86.9%** of the excerpts. Records are in `docs/results/o2/keys_csd/`. The run used commit `df3f977` with one fix, committed next: the check on song pairs had crashed on the song without a reference.
 
-* **MIR-1K's karaoke backing cannot replace the labels.** In 60 of the 100 MIR-1K key excerpts, the singer's pitch classes fit the stored backing best at another transposition, 39 of them clearly, so the singer is often not in the backing's key (`scripts/mir1k_backing_check.py`, `docs/results/o2/mir1k_backing_check.json`). On the 31 excerpts where voice and backing clearly line up, the app's voice-only key matched the backing's on 18 (58%). That is a rough sign, not a result, but it suggests the 75% target is hard on amateur singing.
+| | Excerpts (the O2 figure) | Whole recordings |
+|---|---|---|
+| Exact key, all 198 scored recordings | **86.9%** (172) | 92.4% (183) |
+| 95% CI, Wilson | 81.5–90.9 | 87.9–95.4 |
+| 95% CI, resampling songs | 80.3–92.9 | 87.4–97.0 |
+| Same scale (relative keys count as right) | 88.9% | 92.4% |
+| MIREX score | 0.893 | 0.930 |
+| Exact key, English / Korean | 85.7% / 88.0% | 88.8% / 96.0% |
+| Exact key, major references (190) / minor (8) | 90.5% / 0% | 96.3% / 0% |
+
+Each excerpt starts at the first note and stops before the song's last note: 14–25 s, median 24.6 s. "Hokey pokey" never sings the third above its last note, so its two recordings have no reference and are not scored.
+
+* **The references pass the planned checks.** Both versions of all 99 scored songs differ by exactly the transposition between their note lists. No recording's MIDI sits more than half a semitone from the pitch FCPE hears (the largest offset is 0.30 semitone). Krumhansl–Kessler key finding on the same notes agrees with 73.7% of the references. Where it differs, it is mostly in its usual ways: the dominant (22), or a minor key on the third (14) or sixth degree (8). On the 146 excerpts where it agrees, the app scores 90.4%.
+* **All 8 minor references are major-key songs that end on their third, so the 0% says nothing about minor keys.** They are four songs, each in both keys: "Butterfly" and "나비야" (the same tune), "The first noel" and "마법의 성". In each, 6–15% of the sung time is on a note that the reference's minor key lacks even with its raised 6th and 7th (B♭ against A minor, for example), while the major key a major third below holds 97–100% of it. That major key is the app's answer on every one of these excerpts and whole recordings (`scripts/csd_misses.py`, `docs/results/o2/keys_csd/misses.json`). As fixed in advance, the references were not changed, so these count as misses. The protocol's by-mode figure leaves them out: 90.5% of excerpts on major references (Wilson 85.5–93.9). The evidence on minor keys is still Essen's 67.5% below.
+* **The other 18 misses are close keys, and the song decides.** Twelve are the dominant (5), the relative minor (4), the subdominant (2) or the parallel minor (1), and the whole recording gets 11 of those 12 right. The other 6 are both versions of the only three songs in the set that use 11 or 12 of the 12 pitch classes ("If all the little raindrops", "I'm the music man" and "One for sorrow"), which are missed on the whole recording too. In 16 of the 18 misses the other version of the same song is missed as well, so the interval that resamples songs is the one to quote.
+* **This test is easier than the planned one.** It has one professional singer and simple, mostly diatonic songs, and the reference uses a cue the app also uses, the last note. The excerpts leave that note out but keep earlier phrase endings. Amateur singing may still fall short of 75%. Amateur-like Essen excerpts of 8–20 s give 73.8% (below), and on the 31 MIR-1K excerpts where voice and karaoke backing line up, the app matched the backing's key on 18 (58%).
+* **MIR-1K's karaoke backing could not replace the labels.** In 60 of the 100 MIR-1K key excerpts, the singer's pitch classes fit the stored backing best at another transposition, 39 of them clearly, so the singer is often not in the backing's key (`scripts/mir1k_backing_check.py`, `docs/results/o2/mir1k_backing_check.json`). That is why the 58% above comes from a small subset and is a rough sign, not a result.
+
+### Development on the Essen folksong collection
 
 The estimator was rebuilt and tuned on the training volumes of the Essen collection (4,670 songs). It was then tested on 2,486 different songs, rendered as in-tune and amateur singing. Details are in [O2_PROTOCOL.md](O2_PROTOCOL.md#b2-development-and-held-out-test-on-the-essen-folksong-collection).
 
@@ -63,7 +81,7 @@ The estimator was rebuilt and tuned on the training volumes of the Essen collect
 | Amateur, 8–20 s excerpt | 35.8% | **73.8%** (95% CI 72.0–75.5) |
 | Minor-key items | 39.7% | **67.5%** |
 
-* **The hand-labelled result could land on either side of 75%.** Amateur-like excerpts of 8–20 s sit right at it, so the labelled excerpts are longer: 12–30 s, one per MIR-1K song.
+* **Amateur excerpts sit right at the target.** Amateur-like excerpts of 8–20 s give 73.8%, which is why the planned hand-labelled excerpts were longer (12–30 s, one per MIR-1K song).
 * **Detuned singing is not a fair key test** (7–11%, because random 10–100 cent offsets wipe out the pitch-class evidence). O3 is therefore scored with the key the user types.
 * **Minor melodies often leave natural minor.** 64% of Essen's minor songs use the raised 7th, and only 6% stay inside natural minor. In-key snapping in a minor key therefore allows the raised 6th and 7th too (`Key.snap_classes`), so leading tones are not pulled down.
 * On audio, the key came out the same from pYIN (80.0%), PESTO through ONNX (79.0%) and the true contour (80.0%), so tracker errors are not the bottleneck.

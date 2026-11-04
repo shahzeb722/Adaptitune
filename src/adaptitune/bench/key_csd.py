@@ -267,13 +267,19 @@ def evaluate_csd(root: str | Path, out_dir: str | Path = "results/keys_csd", tra
             r[kind + "_mirex"] = mirex_key_score(k.key, ref) if k and ref else 0.0
         rows.append(r)
     df = pd.DataFrame(rows)
+    out = Path(out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    df.to_csv(out / "per_recording.csv", index=False)
 
     # checks on the references (reported, never used to change one)
     pairs = consistent = 0
     by_song = {s: g.set_index("version") for s, g in df.groupby("song")}
     for s, g in by_song.items():
-        if {"a", "b"} <= set(g.index) and g.loc["a", "reference"] and g.loc["b", "reference"]:
-            ka, kb = Key.parse(g.loc["a", "reference"]), Key.parse(g.loc["b", "reference"])
+        if not {"a", "b"} <= set(g.index):
+            continue
+        ra, rb = g.loc["a", "reference"], g.loc["b", "reference"]
+        if isinstance(ra, str) and isinstance(rb, str):  # a recording without a reference is NaN here
+            ka, kb = Key.parse(ra), Key.parse(rb)
             t = transposition(notes_of[g.loc["a", "recording"]], notes_of[g.loc["b", "recording"]])
             pairs += 1
             consistent += int(ka.mode == kb.mode and (ka.tonic + t) % 12 == kb.tonic)
@@ -300,8 +306,5 @@ def evaluate_csd(root: str | Path, out_dir: str | Path = "results/keys_csd", tra
         "git_commit": _git_commit(),
     }
     summary["O2_key_pass"] = bool(summary["excerpt"].get("exact", 0) >= 0.75)
-    out = Path(out_dir)
-    out.mkdir(parents=True, exist_ok=True)
-    df.to_csv(out / "per_recording.csv", index=False)
     (out / "summary.json").write_text(json.dumps(summary, indent=2))
     return summary

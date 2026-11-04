@@ -1,0 +1,125 @@
+{
+  "run": "results/keys_csd",
+  "scored": 198,
+  "minor_references": [
+    {
+      "recording": "en005a",
+      "song_name": "Butterfly",
+      "reference": "A minor",
+      "app_excerpt": "F major",
+      "app_whole": "F major",
+      "krumhansl": "A minor",
+      "share_outside_reference_minor": 0.107,
+      "notes_outside_reference_minor": "A#",
+      "major_key_below": "F major",
+      "share_inside_major_key_below": 1.0,
+      "last_notes": "C C A A A"
+    },
+    {
+      "recording": "en005b",
+      "song_name": "Butterfly",
+      "reference": "D# minor",
+      "app_excerpt": "B major",
+      "app_whole": "B major",
+      "krumhansl": "D# minor",
+      "share_outside_reference_minor": 0.106,
+      "notes_outside_reference_minor": "E",
+      "major_key_below": "B major",
+      "share_inside_major_key_below": 1.0,
+      "last_notes": "F# F# D# D# D#"
+    },
+    {
+      "recording": "en014a",
+      "song_name": "The first noel",
+      "reference": "D minor",
+      "app_excerpt": "A# major",
+      "app_whole": "A# major",
+      "krumhansl": "A# major",
+      "share_outside_reference_minor": 0.067,
+      "notes_outside_reference_minor": "D#",
+      "major_key_below": "A# major",
+      "share_inside_major_key_below": 1.0,
+      "last_notes": "A A# F D# D"
+    },
+    {
+      "recording": "en014b",
+      "song_name": "The first noel",
+      "reference": "B minor",
+      "app_excerpt": "G major",
+      "app_whole": "G major",
+      "krumhansl": "G major",
+      "share_outside_reference_minor": 0.063,
+      "notes_outside_reference_minor": "C",
+      "major_key_below": "G major",
+      "share_inside_major_key_below": 1.0,
+      "last_notes": "F# G D C B"
+    },
+    {
+      "recording": "kr006a",
+      "song_name": "나비야",
+      "reference": "A minor",
+      "app_excerpt": "F major",
+      "app_whole": "F major",
+      "krumhansl": "A minor",
+      "share_outside_reference_minor": 0.105,
+      "notes_outside_reference_minor": "A#",
+      "major_key_below": "F major",
+      "share_inside_major_key_below": 1.0,
+      "last_notes": "C C A A A"
+    },
+    {
+      "recording": "kr006b",
+      "song_name": "나비야",
+      "reference": "D# minor",
+      "app_excerpt": "B major",
+      "app_whole": "B major",
+      "krumhansl": "D# minor",
+      "share_outside_reference_minor": 0.103,
+      "notes_outside_reference_minor": "E",
+      "major_key_below": "B major",
+      "share_inside_major_key_below": 1.0,
+      "last_notes": "F# F# D# D# D#"
+    },
+    {
+      "recording": "kr008a",
+      "song_name": "마법의 성",
+      "reference": "D minor",
+      "app_excerpt": "A# major",
+      "app_whole": "A# major",
+      "krumhansl": "A# major",
+      "share_outside_reference_minor": 0.145,
+      "notes_outside_reference_minor": "D# F#",
+      "major_key_below": "A# major",
+      "share_inside_major_key_below": 0.969,
+      "last_notes": "A# A C D# D"
+    },
+    {
+      "recording": "kr008b",
+      "song_name": "마법의 성",
+      "reference": "E minor",
+      "app_excerpt": "C major",
+      "app_whole": "C major",
+      "krumhansl": "C major",
+      "share_outside_reference_minor": 0.144,
+      "notes_outside_reference_minor": "F G#",
+      "major_key_below": "C major",
+      "share_inside_major_key_below": 0.969,
+      "last_notes": "C B D F E"
+    }
+  ],
+  "excerpt_misses": {
+    "count": 26,
+    "with_a_minor_reference": 8,
+    "others_by_relation": {
+      "dominant": 5,
+      "whole tone below": 4,
+      "relative": 4,
+      "3 semitones up, same mode": 2,
+      "subdominant": 2,
+      "parallel": 1
+    },
+    "others_right_on_the_whole_recording": 11,
+    "others_where_the_other_version_was_missed_too": 16
+  },
+  "excerpt_exact_on_major_references": 0.9053
+}

@@ -1,0 +1,27 @@
+recording,song_name,reference,app_excerpt,relation,whole_right,krumhansl,pitch_classes_used,other_version_missed_too,last_notes
+en005a,Butterfly,A minor,F major,major key whose third is the reference tonic,False,A minor,5,True,C C A A A
+en005b,Butterfly,D# minor,B major,major key whose third is the reference tonic,False,D# minor,5,True,F# F# D# D# D#
+en014a,The first noel,D minor,A# major,major key whose third is the reference tonic,False,A# major,7,True,A A# F D# D
+en014b,The first noel,B minor,G major,major key whose third is the reference tonic,False,G major,7,True,F# G D C B
+en023b,Auld lang syne,F major,C major,dominant,True,F major,5,False,F D D C F
+en025a,If all the little raindrops,D# major,C# major,whole tone below,False,D# minor,11,True,G F D# D D#
+en025b,If all the little raindrops,F major,D# major,whole tone below,False,F minor,11,True,A G F E F
+en030a,We wish you a merry christmas,F# major,C# major,dominant,True,F# major,7,True,C# D# G# F F#
+en030b,We wish you a merry christmas,E major,B major,dominant,True,E major,7,True,B C# F# D# E
+en031a,The muffin man,C major,C minor,parallel,False,C major,9,False,D D G G C
+en032a,I'm the music man,A major,C major,"3 semitones up, same mode",False,F# minor,12,True,G G A A A
+en032b,I'm the music man,F major,G# major,"3 semitones up, same mode",False,D minor,12,True,D# D# F F F
+en034a,One for sorrow,D major,C major,whole tone below,False,C major,11,True,G G F# F# D
+en034b,One for sorrow,C major,A# major,whole tone below,False,A# major,11,True,F F E E C
+kr006a,나비야,A minor,F major,major key whose third is the reference tonic,False,A minor,5,True,C C A A A
+kr006b,나비야,D# minor,B major,major key whose third is the reference tonic,False,D# minor,5,True,F# F# D# D# D#
+kr008a,마법의 성,D minor,A# major,major key whose third is the reference tonic,False,A# major,8,True,A# A C D# D
+kr008b,마법의 성,E minor,C major,major key whose third is the reference tonic,False,C major,8,True,C B D F E
+kr014a,옥수수,C# major,G# major,dominant,True,G# major,7,True,D# D# G# G# C#
+kr014b,옥수수,A# major,F major,dominant,True,F major,7,True,C C F F A#
+kr015a,이슬,F major,D minor,relative,True,F major,9,True,E G A G F
+kr015b,이슬,C# major,A# minor,relative,True,C# major,9,True,C D# F D# C#
+kr021a,동물농장,A# major,G minor,relative,True,A# major,7,True,G A A# C A#
+kr021b,동물농장,D major,B minor,relative,True,D major,7,True,B C# D E D
+kr039a,새싹들이다,E major,A major,subdominant,True,E major,7,True,G# G# F# B E
+kr039b,새싹들이다,C# major,F# major,subdominant,True,C# major,7,True,F F D# G# C#

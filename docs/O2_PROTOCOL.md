@@ -189,7 +189,7 @@ This section was written, and its code committed, before the dataset was on disk
 
 **Why.** Nobody with the ear to label keys was available for B3. The team first checked whether the karaoke backing that MIR-1K stores beside each vocal (the left channel) could stand in for the labels. It cannot. Comparing the pitch classes of MIR-1K's human-labelled vocal pitch (`PitchLabel/`) with the backing's chroma under every transposition, 60 of the 100 key excerpts match best at a transposition other than 0, 39 of them clearly (a correlation gain over 0.3). In those excerpts the singer is not in the stored backing's key, most likely because of karaoke key changes, so the backing's key is not the sung key (`scripts/mir1k_backing_check.py`, `docs/results/o2/mir1k_backing_check.json`). On 4 November 2026 Shahzeb chose to test on a dataset whose keys are fixed by its own note files.
 
-**Data.** The Children's Song Dataset (CSD; Choi et al., ISMIR 2020 late-breaking demo; zenodo.org/records/4785016, CC BY-NC-SA 4.0): 50 Korean and 50 English children's songs, each sung twice in different keys (file names ending in `a` and `b`) by one professional singer. That makes 200 recordings, each with MIDI notes aligned to the singing by hand.
+**Data.** The Children's Song Dataset (CSD; Choi et al., ISMIR 2020 late-breaking demo; zenodo.org/records/4785016, CC BY-NC-SA 4.0): 50 Korean and 50 English children's songs, each sung twice in different keys (file names ending in `a` and `b`) by one professional singer. That makes 200 recordings, each with MIDI notes aligned to the singing by hand. *Added when the data arrived, before any result:* the 44.1 kHz stereo WAVs have identical channels; they were converted on the laptop to 24 kHz mono FLAC for the transfer, which keeps everything the app's trackers use. `data/manifests/csd.sha256` lists the SHA-256 of the original files.
 
 **Reference keys** come from each recording's MIDI notes alone (`adaptitune.bench.key_csd`):
 
@@ -205,6 +205,8 @@ This section was written, and its code committed, before the dataset was on disk
 
 **What this test can and cannot show.** It checks the whole audio-to-key path on real singing, against keys nobody had to judge by ear. It is easier than the planned test. There is one professional singer, the songs are simple and diatonic, and the references come from the notes with the same kind of cue the app also uses (the final note). It says nothing about amateur intonation. The Essen `amateur` condition covers that (73.8% on excerpts, B2), and MIR-1K gives a rough sign. On the 31 excerpts where voice and backing clearly line up, the app's voice-only key matched the backing's key on 18 (58%). The backing's key there is the majority of five Essentia key profiles, which all agree on only 58 of the 100 backings.
 
+**Run (added after the result, 4 November 2026).** The run used commit `df3f977`. The check on song pairs crashed on the one song without a reference ("Hokey pokey", which never sings the third above its last note). The fix skips that pair, as the method already says, and changes no score; nothing else was changed. The app named the exact key on 86.9% of the excerpts (172 of 198; Wilson 81.5–90.9, resampling songs 80.3–92.9), so the criterion is met on this test ([RESULTS.md](RESULTS.md#o2-key-estimation)). The checks found one fault in the reference rule. All 8 minor references are major-key songs that end on their third: each melody uses a note outside the reference's minor key, and the app named the major key a major third below every time (`scripts/csd_misses.py`). As fixed above, they were reported and not changed, so they count as misses.
+
 ---
 
 ## What still needs the real data
@@ -213,5 +215,5 @@ This section was written, and its code committed, before the dataset was on disk
 |---|---|---|
 | Tracker benchmark | `bench-trackers --dataset mir1k` and `--dataset mdb` (A8), then `choose-tracker` | MIR-1K, MDB-stem-synth, the reference laptop |
 | Key excerpts | `key-excerpts data/raw/MIR-1K --source mir1k` | MIR-1K |
-| Key test | `key-eval-csd data/raw/CSD` (B4) | CSD, downloaded on the laptop (Zenodo is blocked in the cloud) |
+| Key test | `key-eval-csd data/raw/CSD` (B4) | Done on 4 November 2026 ([RESULTS.md](RESULTS.md#o2-key-estimation)) |
 | Labelling, if raters become available | `tools/key_rater.html`, then `key-agreement`, then `eval-keys` (B3) | Two raters, about 1.5 hours each |

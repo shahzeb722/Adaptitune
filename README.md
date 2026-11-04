@@ -72,6 +72,7 @@ adaptitune corpus-stats data/corpus                                         # O1
 adaptitune verify-corpus data/corpus --tracker fcpe                         # every kept offset re-measured
 adaptitune key-excerpts data/raw/MIR-1K --source mir1k --out key_excerpts   # then label with tools/key_rater.html
 adaptitune key-eval-csd data/raw/CSD --out results/keys_csd                  # O2 key test on CSD (docs/O2_PROTOCOL.md, B4)
+python scripts/csd_misses.py results/keys_csd data/raw/CSD                # what the CSD key misses are
 python scripts/calibrate_quality.py data/corpus --tracker fcpe             # WORLD quality-check threshold, training singers only
 adaptitune eval-corrector data/corpus --tracker fcpe --measure-tracker pyin # O3 on the test singers (add --shard k/n to split it)
 ```
