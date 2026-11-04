@@ -56,7 +56,7 @@ from PySide6.QtWidgets import (
 )
 
 from .. import metrics as M
-from ..audio import Audio, preprocess, save
+from ..audio import Audio, load, preprocess, save
 from ..correction.settings import RETUNE_MS_LEVELS, CorrectionSettings
 from ..music import Key
 from .pitchview import PitchView
@@ -65,6 +65,10 @@ APP_NAME = "AdaptiTune"
 
 
 # ----------------------------------------------------------------------------- workers
+
+
+class UserMessage(Exception):
+    """A failure the user can act on: the window shows its message, not a traceback."""
 
 
 class _Signals(QObject):
@@ -84,7 +88,9 @@ class Job(QRunnable):
     def run(self):
         try:
             self.signals.done.emit(self.fn(*self.a, **self.kw))
-        except Exception:  # pragma: no cover - surfaced in a dialog
+        except UserMessage as e:
+            self.signals.failed.emit(str(e))
+        except Exception:  # surfaced in a dialog, with the traceback under "Show Details"
             self.signals.failed.emit(traceback.format_exc())
 
 
@@ -383,8 +389,13 @@ class MainWindow(QMainWindow):
 
     def _error(self, text):
         self.errors.append(text)
-        if self.show_errors:
-            QMessageBox.critical(self, APP_NAME, text)
+        if not self.show_errors:
+            return
+        box = QMessageBox(QMessageBox.Critical, APP_NAME, text, QMessageBox.Ok, self)
+        if text.startswith("Traceback"):  # a bug, not something the user did: keep the details for a report
+            box.setText("Something went wrong. Please save the details below and send them to the AdaptiTune team.")
+            box.setDetailedText(text)
+        box.exec()
 
     def _play(self, audio):
         if audio is not None and self.player:
@@ -417,6 +428,10 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------------ users / profile (FR7)
     def _switch_user(self, user):
         self.session = self._session_factory(user)
+        # a version made for the previous singer must not collect this singer's feedback
+        self.result, self.ab = None, None
+        self.table.setRowCount(0)
+        self._set_enabled(self.take is not None)
         self.user_box.clear()
         self.user_box.addItems(sorted(set(self.session.store.users()) | {user}))
         self.user_box.setCurrentText(user)
@@ -426,6 +441,8 @@ class MainWindow(QMainWindow):
         if self.take:
             # re-analyse under the new session's corrector so caches are consistent
             self.take = self.session.load_take(self.take.analysis.audio)
+            an = self.take.analysis
+            self.view.set_data(an.track.hop_s, M.contour_midi(an.track.f0))
         self._update_status()
 
     def _new_user(self):
@@ -473,11 +490,23 @@ class MainWindow(QMainWindow):
 
     def _load(self, src):
         key = None if self.key_box.currentIndex() == 0 else self.key_box.currentText()
-        self._run(self.session.load_take, self._loaded, "Analysing…", src, key)
+        self._run(self._read_and_analyse, self._loaded, "Analysing…", src, key)
+
+    def _read_and_analyse(self, src, key):
+        """Runs on the worker thread: read the file, check it is usable, then analyse it."""
+        if not isinstance(src, Audio):
+            try:
+                src = load(src)
+            except Exception as e:
+                raise UserMessage(f"AdaptiTune could not read {Path(src).name}. It reads WAV, FLAC, OGG, MP3 and AIFF "
+                                  "files; convert anything else to WAV first.") from e
+        if src.duration < 0.5:
+            raise UserMessage("This take is shorter than half a second, so there is nothing to correct.")
+        return self.session.load_take(src, key)
 
     def _loaded(self, take):
         self.take = take
-        self.result = None
+        self.result, self.ab = None, None
         an = take.analysis
         self.key_label.setText(f"detected: {an.key.name} ({an.key_confidence:.0%})" if self.key_box.currentIndex() == 0 else "")
         self.view.set_data(an.track.hop_s, M.contour_midi(an.track.f0))

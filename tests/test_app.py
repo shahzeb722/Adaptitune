@@ -79,6 +79,57 @@ def test_buttons_deliver_results_from_the_worker_thread(tmp_path, detuned, monke
     w.close()
 
 
+def test_switching_singer_drops_the_previous_version(tmp_path, detuned, monkeypatch):
+    """A version made for one singer must not collect the next singer's rating: that would
+    credit the wrong profile (and put wrong data into the O6 study)."""
+    monkeypatch.setenv("ADAPTITUNE_HOME", str(tmp_path))
+    from PySide6.QtWidgets import QApplication
+
+    from adaptitune.agent.profile import ProfileStore
+    from adaptitune.agent.session import AdaptiveSession
+    from adaptitune.app.main import MainWindow
+    from adaptitune.audio import Audio
+    from adaptitune.pipeline import Corrector
+
+    app = QApplication.instance() or QApplication([])
+    store = ProfileStore(tmp_path / "p.sqlite")
+    w = MainWindow(session_factory=lambda u: AdaptiveSession(u, store, Corrector("yin"), seed=0), show_errors=False)
+    w.player = None
+    take = w.session.load_take(Audio(detuned.samples, detuned.sr), key="C major")
+    w._loaded(take)
+    w._auto_done(w.session.propose(take))
+    assert w.btn_keep.isEnabled() and w.rating.isEnabled()
+    w._switch_user("second")
+    assert w.result is None and w.table.rowCount() == 0
+    assert not w.btn_keep.isEnabled() and not w.rating.isEnabled() and w.btn_correct.isEnabled()
+    w._feedback("rating", 5)
+    assert w.session.interactions == 0
+    w.close()
+    app.processEvents()
+
+
+def test_unreadable_file_gets_a_plain_message(tmp_path, monkeypatch):
+    monkeypatch.setenv("ADAPTITUNE_HOME", str(tmp_path))
+    from PySide6.QtWidgets import QApplication
+
+    from adaptitune.agent.profile import ProfileStore
+    from adaptitune.agent.session import AdaptiveSession
+    from adaptitune.app.main import MainWindow
+    from adaptitune.pipeline import Corrector
+
+    app = QApplication.instance() or QApplication([])
+    store = ProfileStore(tmp_path / "p.sqlite")
+    w = MainWindow(session_factory=lambda u: AdaptiveSession(u, store, Corrector("yin"), seed=0), show_errors=False)
+    w.player = None
+    (tmp_path / "broken.wav").write_bytes(b"not audio at all " * 300)
+    w._load(str(tmp_path / "broken.wav"))
+    _wait(app, lambda: bool(w.errors))
+    assert "could not read broken.wav" in w.errors[-1] and "Traceback" not in w.errors[-1]
+    assert w.take is None and not w._jobs
+    w.close()
+    app.processEvents()
+
+
 def test_record_without_a_microphone_resets_the_button(tmp_path, monkeypatch):
     """With no microphone, Record must say why and come back up, not stay pressed; a recording
     too short to analyse is refused the same way."""
