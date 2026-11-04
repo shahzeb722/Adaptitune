@@ -17,20 +17,15 @@ import subprocess
 import sys
 import tempfile
 import time
-import traceback
 from pathlib import Path
 
 import numpy as np
 from PySide6.QtCore import (
-    QObject,
-    QRunnable,
     QStandardPaths,
     Qt,
     QThreadPool,
     QTimer,
     QUrl,
-    Signal,
-    Slot,
 )
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
@@ -56,7 +51,7 @@ from PySide6.QtWidgets import (
 )
 
 from .. import metrics as M
-from ..audio import Audio, load, preprocess, save
+from ..audio import Audio, load, save
 from ..correction.settings import RETUNE_MS_LEVELS, CorrectionSettings
 from ..music import Key
 from .pitchview import PitchView
@@ -64,97 +59,8 @@ from .pitchview import PitchView
 APP_NAME = "AdaptiTune"
 
 
-# ----------------------------------------------------------------------------- workers
-
-
-class UserMessage(Exception):
-    """A failure the user can act on: the window shows its message, not a traceback."""
-
-
-class _Signals(QObject):
-    done = Signal(object)
-    failed = Signal(str)
-
-
-class Job(QRunnable):
-    """Run slow pipeline work off the UI thread."""
-
-    def __init__(self, fn, *a, **kw):
-        super().__init__()
-        self.fn, self.a, self.kw = fn, a, kw
-        self.signals = _Signals()
-
-    @Slot()
-    def run(self):
-        try:
-            self.signals.done.emit(self.fn(*self.a, **self.kw))
-        except UserMessage as e:
-            self.signals.failed.emit(str(e))
-        except Exception:  # surfaced in a dialog, with the traceback under "Show Details"
-            self.signals.failed.emit(traceback.format_exc())
-
-
-class Player:
-    """Plays an Audio buffer. Uses QtMultimedia (no extra dependency) with a temp WAV."""
-
-    def __init__(self):
-        from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer
-
-        self.out = QAudioOutput()
-        self.player = QMediaPlayer()
-        self.player.setAudioOutput(self.out)
-        self.tmp = Path(tempfile.mkdtemp(prefix="adaptitune_"))
-        self.n = 0
-
-    def play(self, audio: Audio):
-        self.stop()
-        self.n += 1
-        f = self.tmp / f"play_{self.n}.wav"
-        save(f, audio)
-        self.player.setSource(QUrl.fromLocalFile(str(f)))
-        self.player.play()
-
-    def stop(self):
-        self.player.stop()
-
-    def close(self):
-        self.stop()
-        shutil.rmtree(self.tmp, ignore_errors=True)
-
-
-class Recorder:
-    """Microphone capture through sounddevice (PortAudio). Optional: import still works
-    without it."""
-
-    def __init__(self, sr: int = 44_100):
-        self.sr = sr
-        self.chunks = []
-        self.stream = None
-
-    @staticmethod
-    def available() -> bool:
-        try:
-            import sounddevice  # noqa: F401
-
-            return True
-        except Exception:
-            return False
-
-    def start(self):
-        import sounddevice as sd
-
-        self.chunks = []
-        self.stream = sd.InputStream(samplerate=self.sr, channels=1, callback=lambda d, *_: self.chunks.append(d.copy()))
-        self.stream.start()
-
-    def stop(self) -> Audio:
-        if self.stream is not None:
-            self.stream.stop()
-            self.stream.close()
-            self.stream = None
-        x = np.concatenate(self.chunks)[:, 0] if self.chunks else np.zeros(1)
-        return preprocess(x, self.sr)
-
+from .audio_io import Player, Recorder  # noqa: E402,F401 (Recorder: checks.py and the tests import it from here)
+from .jobs import Job, Jobs, UserMessage  # noqa: E402,F401
 
 # ----------------------------------------------------------------------------- main window
 
@@ -165,7 +71,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(APP_NAME)
         self.resize(1000, 720)
         self.pool = QThreadPool.globalInstance()
-        self._jobs = set()  # running jobs; PySide drops a job's result if nothing holds the job
+        self._jobs = Jobs(self.pool)  # holds each running job until its result is back
         self.errors = []  # tracebacks of failed jobs (the self-test reads them)
         self.show_errors = show_errors
         self._session_factory = session_factory or self._default_session
@@ -267,6 +173,8 @@ class MainWindow(QMainWindow):
         self._build_menu()
 
     def _build_menu(self):
+        st = self.menuBar().addMenu("&Study")
+        st.addAction("Run a study session…").triggered.connect(self._study)
         m = self.menuBar().addMenu("&Help")
         m.addAction("Speed test…").triggered.connect(self._speed_test)
         m.addAction("Check this installation").triggered.connect(self._self_test)
@@ -376,16 +284,16 @@ class MainWindow(QMainWindow):
     def _run(self, fn, done, msg, *a, **kw):
         """Run ``fn`` on a worker thread, then ``done(result)`` back on the UI thread."""
         self._busy(msg)
-        job = Job(fn, *a, **kw)
-        self._jobs.add(job)  # without this reference PySide discards the finished signal
 
-        def finished():
-            self._jobs.discard(job)
+        def ok(result):
             self._idle()
+            done(result)
 
-        job.signals.done.connect(lambda r: (finished(), done(r)))
-        job.signals.failed.connect(lambda e: (finished(), self._error(e)))
-        self.pool.start(job)
+        def failed(text):
+            self._idle()
+            self._error(text)
+
+        self._jobs.start(fn, ok, failed, *a, **kw)
 
     def _error(self, text):
         self.errors.append(text)
@@ -597,6 +505,16 @@ class MainWindow(QMainWindow):
         self.session.save_manual(self.take, self._manual_settings(), seconds=secs, adjustments=self.manual_adjustments)
         self.manual_started, self.manual_adjustments = None, 0
         self._update_status("saved as your manual setting")
+
+    # ------------------------------------------------------------------ study (O6)
+    def _study(self):
+        from .study import StudyWindow
+
+        if getattr(self, "study_window", None) is not None and self.study_window.isVisible():
+            self.study_window.raise_()
+            return
+        self.study_window = StudyWindow(self.session.corrector, self.player, self, show_errors=self.show_errors)
+        self.study_window.show()
 
     # ------------------------------------------------------------------ help: checks (O5)
     def _speed_test(self):
