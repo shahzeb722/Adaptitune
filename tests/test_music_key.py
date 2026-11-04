@@ -1,9 +1,9 @@
 import numpy as np
 import pytest
 
-from adaptitune.data.synth import SungNote, random_melody, sing
+from adaptitune.data.synth import SungNote, sing
 from adaptitune.music import Key, hz_to_midi, midi_to_hz, nearest_in_scale
-from adaptitune.pitch.key import estimate_key, same_key_or_relative
+from adaptitune.pitch.key import estimate_key
 
 
 def test_hz_midi_roundtrip():
@@ -24,6 +24,17 @@ def test_nearest_in_scale():
     assert nearest_in_scale(60.6, None) == 61
 
 
+def test_minor_keys_snap_to_the_raised_sixth_and_seventh():
+    am = Key.parse("A minor")
+    assert set(am.pitch_classes) == set(Key.parse("C major").pitch_classes)
+    assert set(am.snap_classes) == set(am.pitch_classes) | {6, 8}  # F# and G#
+    assert nearest_in_scale(68.1, am) == 68  # an in-tune G# (leading tone) stays G#
+    assert nearest_in_scale(66.2, am) == 66  # F# (melodic minor) stays F#
+    assert nearest_in_scale(67.3, am) == 67  # G natural is still in the key
+    assert nearest_in_scale(69.6, am) == 69  # A# is not in the key: A is nearer than B
+    assert Key.parse("C major").snap_classes == Key.parse("C major").pitch_classes
+
+
 def tonal_melody(rng, tonic, mode, n=24):
     """Random walk over the scale that leans on the tonic triad, like most real tunes."""
     k = Key(tonic, mode)
@@ -31,7 +42,7 @@ def tonal_melody(rng, tonic, mode, n=24):
     pool = [m for m in range(55, 75) if m % 12 in k.pitch_classes]
     w = np.array([3.0 if m % 12 in triad else 1.0 for m in pool])
     mel = list(rng.choice(pool, size=n, p=w / w.sum()))
-    root = min((m for m in pool if m % 12 == tonic))
+    root = min(m for m in pool if m % 12 == tonic)
     return [root] + mel + [root]
 
 

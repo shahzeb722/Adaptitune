@@ -1,0 +1,47 @@
+{
+  "run": "results/corrector_vocalset_fcpe",
+  "tracker": "fcpe",
+  "notes_under_50": 3397,
+  "misses": 533,
+  "miss_share": 0.1569,
+  "causes": {
+    "1. target outside the key": {
+      "notes": 109,
+      "share_of_notes": 0.0321
+    },
+    "2. detuned note nearer the neighbouring semitone": {
+      "notes": 143,
+      "share_of_notes": 0.0421
+    },
+    "3. planner merged it with a neighbouring note": {
+      "notes": 70,
+      "share_of_notes": 0.0206
+    },
+    "4. planner's note centre past halfway": {
+      "notes": 58,
+      "share_of_notes": 0.0171
+    },
+    "5. planner chose another note, centre within 50 cents": {
+      "notes": 0,
+      "share_of_notes": 0.0
+    },
+    "6. right note planned; output measured an octave or more off": {
+      "notes": 57,
+      "share_of_notes": 0.0168
+    },
+    "7. right note planned; the clean note is misread too": {
+      "notes": 35,
+      "share_of_notes": 0.0103
+    },
+    "8. right note planned; output measured 50-600 cents off": {
+      "notes": 61,
+      "share_of_notes": 0.018
+    }
+  },
+  "in_key_and_nearer_target": {
+    "notes": 2765,
+    "median_abs_error": 6.63,
+    "share_within_25": 0.8051,
+    "miss_share": 0.0937
+  }
+}

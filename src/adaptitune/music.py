@@ -9,6 +9,9 @@ import numpy as np
 NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 MAJOR_STEPS = (0, 2, 4, 5, 7, 9, 11)
 MINOR_STEPS = (0, 2, 3, 5, 7, 8, 10)  # natural minor
+# Sung minor-key melodies also use the raised 6th and 7th (melodic and harmonic minor, e.g. the
+# leading tone G# in A minor), so in-key snapping in a minor key allows them too.
+MINOR_RAISED_STEPS = (9, 11)
 
 
 def hz_to_midi(f: np.ndarray | float) -> np.ndarray:
@@ -38,6 +41,14 @@ class Key:
         return tuple((self.tonic + s) % 12 for s in steps)
 
     @property
+    def snap_classes(self) -> tuple[int, ...]:
+        """Pitch classes in-key snapping may choose: the scale, plus the raised 6th and 7th
+        in a minor key. Key estimation and key comparisons use ``pitch_classes``."""
+        if self.mode == "major":
+            return self.pitch_classes
+        return tuple(sorted(set(self.pitch_classes) | {(self.tonic + s) % 12 for s in MINOR_RAISED_STEPS}))
+
+    @property
     def name(self) -> str:
         return f"{NOTE_NAMES[self.tonic]} {self.mode}"
 
@@ -47,10 +58,10 @@ class Key:
         t = text.strip().replace("♯", "#").replace("♭", "b")
         mode = "major"
         low = t.lower()
-        if low.endswith("minor") or low.endswith(" min"):
+        if low.endswith(("minor", " min")):
             mode = "minor"
             t = t[: t.lower().rfind("min")].strip()
-        elif low.endswith("major") or low.endswith(" maj"):
+        elif low.endswith(("major", " maj")):
             t = t[: t.lower().rfind("maj")].strip()
         elif len(t) >= 2 and t.endswith("m"):
             mode, t = "minor", t[:-1]
@@ -69,14 +80,32 @@ class Key:
 
 
 def nearest_in_scale(midi: float, key: Key | None) -> int:
-    """Nearest semitone (chromatic if key is None) to a fractional MIDI value."""
+    """Nearest semitone (chromatic if key is None) to a fractional MIDI value, among the key's
+    ``snap_classes`` otherwise."""
     if key is None:
         return int(np.round(midi))
+    allowed = key.snap_classes
     base = int(np.floor(midi))
     best, best_d = base, 1e9
     for cand in range(base - 2, base + 3):
-        if cand % 12 in key.pitch_classes:
+        if cand % 12 in allowed:
             d = abs(cand - midi)
             if d < best_d - 1e-9:
                 best, best_d = cand, d
     return best
+
+
+def tuning_offset_cents(midi: np.ndarray, weights: np.ndarray | None = None) -> float:
+    """Global tuning of a set of pitches relative to A440 equal temperament, in cents
+    (-50, 50]: the weighted circular mean of their distance from the nearest semitone. A choir
+    or singer that is 30 cents flat throughout gives about -30."""
+    m = np.asarray(midi, dtype=np.float64)
+    w = np.ones_like(m) if weights is None else np.asarray(weights, dtype=np.float64)
+    ok = ~np.isnan(m) & (w > 0)
+    if not ok.any():
+        return 0.0
+    z = np.sum(w[ok] * np.exp(2j * np.pi * m[ok]))
+    if abs(z) < 1e-12:
+        return 0.0
+    c = float(np.angle(z) / (2 * np.pi) * 100)
+    return 50.0 if c <= -50 else c

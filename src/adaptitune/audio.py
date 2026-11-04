@@ -79,9 +79,10 @@ def load(path: str | Path, sr: int = SYNTH_SR, normalize: bool = True) -> Audio:
     return Audio(x, sr)
 
 
-def save(path: str | Path, audio: Audio) -> None:
+def save(path: str | Path, audio: Audio, subtype: str | None = None) -> None:
+    """Write a WAV file (32-bit float by default; ``subtype="PCM_16"`` halves the size)."""
     Path(path).parent.mkdir(parents=True, exist_ok=True)
-    sf.write(str(path), np.clip(audio.samples, -1, 1).astype(np.float32), audio.sr)
+    sf.write(str(path), np.clip(audio.samples, -1, 1).astype(np.float32), audio.sr, subtype=subtype)
 
 
 def preprocess(x: np.ndarray, sr: int, out_sr: int = SYNTH_SR) -> Audio:

@@ -20,6 +20,7 @@ scoops, like the classic effect).
 
 from __future__ import annotations
 
+from bisect import insort
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -121,17 +122,26 @@ def segment_notes(midi: np.ndarray, hop_s: float) -> list[tuple[int, int]]:
         if b - a < min_len:
             continue
         s = _smooth(midi[a:b], win)
+        vals = s.tolist()
         segs, start, away = [], 0, 0
-        for i in range(len(s)):
-            ref = np.median(s[start : max(i, start + 1)])
-            if abs(s[i] - ref) > SPLIT_SEMITONES and i - start > min_len:
+        window: list[float] = []  # sorted s[start:i], so the running median costs O(log n)
+        for i in range(len(vals)):
+            if i == start:
+                ref = vals[start]
+            else:
+                k = len(window)
+                ref = window[k // 2] if k % 2 else (window[k // 2 - 1] + window[k // 2]) / 2
+            if abs(vals[i] - ref) > SPLIT_SEMITONES and i - start > min_len:
                 away += 1
                 if away >= hold:
                     cut = i - hold + 1
                     segs.append((start, cut))
                     start, away = cut, 0
+                    window = sorted(vals[start : i + 1])
+                    continue
             else:
                 away = 0
+            insort(window, vals[i])
         segs.append((start, len(s)))
         # merge tiny pieces into the closer neighbour
         merged: list[list[int]] = []

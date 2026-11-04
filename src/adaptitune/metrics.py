@@ -1,6 +1,6 @@
 """Objective metrics (proposal 5.3, 5.4 and Table 3).
 
-* Tracker accuracy: raw pitch / raw chroma accuracy (mir_eval).
+* Tracker accuracy: raw pitch / raw chroma / overall accuracy and finer tolerances (mir_eval).
 * Corrector accuracy: per-note distance from the intended semitone, at the note centre.
 * Expressiveness: vibrato rate and extent of a note.
 * Reward terms: in-key accuracy ``a`` and naturalness ``n`` from three artifact indicators.
@@ -17,18 +17,58 @@ from .music import hz_to_midi
 # ----------------------------------------------------------------- tracker accuracy
 
 
-def raw_pitch_accuracy(ref_t, ref_f0, est_t, est_f0, cent_tolerance: float = 50) -> dict:
+def pitch_metrics(ref_t, ref_f0, est_t, est_f0, est_raw_f0=None, tolerances=(50, 25, 10)) -> dict:
+    """Frame-level tracker accuracy against a reference contour, with mir_eval.
+
+    ``est_raw_f0`` is the tracker's pitch on every frame, before its voicing decision. When it
+    is given, unvoiced frames are passed to mir_eval as negative frequencies (mir_eval's
+    convention for "unvoiced, but here is my pitch guess"), so raw pitch and raw chroma
+    accuracy measure pitch only, as in the CREPE, PESTO and FCPE papers, while voicing recall,
+    false alarm and overall accuracy still use the tracker's voicing decision.
+
+    Returns ``rpa``/``rca`` at the first tolerance (50 cents, the standard), ``rpa_25`` and
+    ``rpa_10`` (finer tolerances, which matter for pitch correction), ``oa``, ``vr``, ``vfa``,
+    ``median_err_cents`` (median |error| on reference-voiced frames that are within 50 cents,
+    i.e. the fine accuracy of the frames counted as correct), ``octave_err`` (share of
+    reference-voiced frames that are a whole number of octaves off, within 50 cents) and
+    ``n_ref_voiced`` (to pool frames across items).
+    """
     import mir_eval
 
+    est = np.asarray(est_f0, float)
+    if est_raw_f0 is not None:
+        raw = np.abs(np.asarray(est_raw_f0, float))
+        est = np.where(est > 0, est, -raw)
     ref_v, ref_c, est_v, est_c = mir_eval.melody.to_cent_voicing(
-        np.asarray(ref_t, float), np.asarray(ref_f0, float), np.asarray(est_t, float), np.asarray(est_f0, float)
+        np.asarray(ref_t, float), np.asarray(ref_f0, float), np.asarray(est_t, float), est
     )
-    return {
-        "rpa": float(mir_eval.melody.raw_pitch_accuracy(ref_v, ref_c, est_v, est_c, cent_tolerance)),
-        "rca": float(mir_eval.melody.raw_chroma_accuracy(ref_v, ref_c, est_v, est_c, cent_tolerance)),
-        "vr": float(mir_eval.melody.voicing_recall(ref_v, est_v)),
-        "vfa": float(mir_eval.melody.voicing_false_alarm(ref_v, est_v)),
+    mel = mir_eval.melody
+    tol = tolerances[0]
+    out = {
+        "rpa": float(mel.raw_pitch_accuracy(ref_v, ref_c, est_v, est_c, tol)),
+        "rca": float(mel.raw_chroma_accuracy(ref_v, ref_c, est_v, est_c, tol)),
     }
+    for t in tolerances[1:]:
+        out[f"rpa_{t:g}"] = float(mel.raw_pitch_accuracy(ref_v, ref_c, est_v, est_c, t))
+    out["oa"] = float(mel.overall_accuracy(ref_v, ref_c, est_v, est_c, tol))
+    out["vr"] = float(mel.voicing_recall(ref_v, est_v))
+    out["vfa"] = float(mel.voicing_false_alarm(ref_v, est_v))
+    voiced = ref_v > 0
+    both = voiced & (ref_c > 0) & (est_c > 0)
+    d = est_c[both] - ref_c[both]
+    fine = np.abs(d[np.abs(d) < tol])
+    out["median_err_cents"] = float(np.median(fine)) if len(fine) else float("nan")
+    k = np.round(d / 1200)
+    octave = (k != 0) & (np.abs(d - 1200 * k) < tol)
+    out["octave_err"] = float(octave.sum() / max(voiced.sum(), 1))
+    out["n_ref_voiced"] = int(voiced.sum())
+    return out
+
+
+def raw_pitch_accuracy(ref_t, ref_f0, est_t, est_f0, cent_tolerance: float = 50, est_raw_f0=None) -> dict:
+    """rpa, rca, vr and vfa only (see :func:`pitch_metrics`)."""
+    m = pitch_metrics(ref_t, ref_f0, est_t, est_f0, est_raw_f0, tolerances=(cent_tolerance,))
+    return {k: m[k] for k in ("rpa", "rca", "vr", "vfa")}
 
 
 # ----------------------------------------------------------------- notes and vibrato

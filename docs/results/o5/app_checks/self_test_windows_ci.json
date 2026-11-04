@@ -1,0 +1,58 @@
+{
+  "checks": {
+    "FR1 import a vocal": {
+      "pass": true,
+      "detail": "7.0 s take analysed in 17.0 s"
+    },
+    "FR2 key by hand or detected": {
+      "pass": true,
+      "detail": "detected C major; set by hand: G major"
+    },
+    "FR3 correct a take": {
+      "pass": true,
+      "detail": "corrected in 0.5 s"
+    },
+    "FR6 per-note pitch error": {
+      "pass": true,
+      "detail": "9 notes; median error 30 cents before, 16 after"
+    },
+    "FR4 feedback: keep, rating, A/B": {
+      "pass": true,
+      "detail": "3 judgments stored"
+    },
+    "FR5 manual settings saved": {
+      "pass": true,
+      "detail": "saved strength 0.5; 3 judgments after reload"
+    },
+    "FR7 reset or export the profile": {
+      "pass": true,
+      "detail": "exported 18193 bytes; reset to 0 judgments"
+    },
+    "NFR1 no network": {
+      "pass": true,
+      "detail": "no connection attempted"
+    },
+    "NFR3 data stays in the profile folder": {
+      "pass": true,
+      "detail": "files written: demo_take.wav, profile.sqlite, profile_export.json"
+    },
+    "NFR4 packaged app runs the bundled pitch model": {
+      "pass": true,
+      "detail": "tracker fcpe-onnx"
+    }
+  },
+  "info": {
+    "tracker": "fcpe-onnx",
+    "playback": "Qt Multimedia loaded",
+    "recording": "available",
+    "input_devices": 0,
+    "platform": "Windows-10-10.0.26100-SP0",
+    "packaged_app": true,
+    "build": {
+      "git_commit": "93e6d3719dcc179beaf4dba618ed0284ddda22b0",
+      "built": "2026-11-04T08:25:48+0000",
+      "packaged": true
+    }
+  },
+  "pass": true
+}

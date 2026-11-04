@@ -1,0 +1,76 @@
+{
+  "takes": 1512,
+  "routes": [
+    "psola",
+    "world"
+  ],
+  "unique_hours": {
+    "test": 2.2,
+    "train": 2.13,
+    "val": 0.479
+  },
+  "unique_hours_total": 4.81,
+  "singers": {
+    "test": 9,
+    "train": 9,
+    "val": 2
+  },
+  "gender": {
+    "test": {
+      "F": 5,
+      "M": 4
+    },
+    "train": {
+      "M": 6,
+      "F": 3
+    },
+    "val": {
+      "F": 1,
+      "M": 1
+    }
+  },
+  "singer_overlap_test_vs_dev": [],
+  "labelled_notes": 8916,
+  "labels": 17832,
+  "labelled_note_hours": {
+    "test": 0.777,
+    "train": 0.745,
+    "val": 0.12
+  },
+  "kept_note_share": 0.27,
+  "highly_detuned_share": 0.551,
+  "qc_pass_share": 0.8979,
+  "qc_pass_share_by_route": {
+    "psola": 0.9121,
+    "world": 0.8837
+  },
+  "qc_fail_reasons": {
+    "low_coverage": 846,
+    "offset_mismatch": 755,
+    "octave_error": 220
+  },
+  "qc_abs_residual_cents": {
+    "median": 0.65,
+    "p95": 12.33
+  },
+  "offset_abs_cents": {
+    "min": 10.0,
+    "median": 54.5,
+    "max": 100.0
+  },
+  "offset_sign_positive_share": 0.493,
+  "drift_share": 0.348,
+  "scoop_share": 0.348,
+  "vibrato_changed_share": 0.299,
+  "source_dev_abs_cents_median": 9.75,
+  "test_labels_kept": 7624,
+  "hours_by_technique": {
+    "messa": 0.391,
+    "slow_forte": 1.088,
+    "slow_piano": 1.163,
+    "straight": 1.192,
+    "vibrato": 0.976
+  },
+  "O1_test_hours_ok": true,
+  "O1_singers_disjoint": true
+}

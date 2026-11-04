@@ -1,0 +1,62 @@
+{
+  "assignment": {
+    "female7": "test",
+    "female1": "test",
+    "male2": "test",
+    "male3": "test",
+    "female2": "test",
+    "male4": "test",
+    "female4": "test",
+    "male11": "test",
+    "female8": "test",
+    "female9": "val",
+    "male6": "val",
+    "male9": "train",
+    "male10": "train",
+    "male5": "train",
+    "female6": "train",
+    "male1": "train",
+    "female3": "train",
+    "male8": "train",
+    "male7": "train",
+    "female5": "train"
+  },
+  "hours": {
+    "train": 2.1300754535147393,
+    "val": 0.47943405769715286,
+    "test": 2.2004094671201813
+  },
+  "singers": {
+    "train": [
+      "female3",
+      "female5",
+      "female6",
+      "male1",
+      "male10",
+      "male5",
+      "male7",
+      "male8",
+      "male9"
+    ],
+    "val": [
+      "female9",
+      "male6"
+    ],
+    "test": [
+      "female1",
+      "female2",
+      "female4",
+      "female7",
+      "female8",
+      "male11",
+      "male2",
+      "male3",
+      "male4"
+    ]
+  },
+  "target_test_hours": 2.0,
+  "total_hours": 4.809918978332074,
+  "feasible": true,
+  "seed": 0,
+  "method": "plan_split (fewest test singers reaching the target)"
+}

@@ -1,0 +1,354 @@
+{
+  "participants": 15,
+  "trials": 900,
+  "flagged_share": 0.11777777777777777,
+  "acceptance_by_condition_s3_5": {
+    "C1": 0.032,
+    "C2": 0.41,
+    "C3": 0.689,
+    "C4": 0.67
+  },
+  "C3_minus_C1": [
+    0.6286495911495911,
+    0.5245959595959595,
+    0.733161075036075
+  ],
+  "C4_minus_C3": [
+    -0.014522607022607045,
+    -0.16093819143819146,
+    0.12986964886964877
+  ],
+  "C3_minus_C2": [
+    0.2665860990860991,
+    0.059905934343434344,
+    0.4611231060606059
+  ],
+  "with_flagged": {
+    "C3_minus_C1": [
+      0.6108180708180709,
+      0.4998025793650793,
+      0.7189146062271063
+    ],
+    "C4_minus_C3": [
+      -0.026558811558811582,
+      -0.152585927960928,
+      0.09661713980463979
+    ]
+  },
+  "naturalness_noninferiority": {
+    "n": 15,
+    "mean_diff": 0.29588624338624325,
+    "p": 3.0517578125e-05,
+    "pass": true
+  },
+  "naturalness_noninferiority_all_sessions": {
+    "n": 15,
+    "mean_diff": 0.2621482215132101,
+    "p": 0.0003266553907075688,
+    "pass": true
+  },
+  "mixed_logit": [
+    {
+      "term": "Intercept",
+      "log_odds": -3.1059,
+      "sd": 0.0852,
+      "z": -36.4582,
+      "p": 0.0,
+      "p_holm": NaN
+    },
+    {
+      "term": "C(condition, Treatment('C1'))[T.C2]",
+      "log_odds": 2.69,
+      "sd": 0.1549,
+      "z": 17.365,
+      "p": 0.0,
+      "p_holm": 0.0
+    },
+    {
+      "term": "C(condition, Treatment('C1'))[T.C3]",
+      "log_odds": 3.3782,
+      "sd": 0.1217,
+      "z": 27.7508,
+      "p": 0.0,
+      "p_holm": 0.0
+    },
+    {
+      "term": "C(condition, Treatment('C1'))[T.C4]",
+      "log_odds": 3.7699,
+      "sd": 0.2304,
+      "z": 16.365,
+      "p": 0.0,
+      "p_holm": 0.0
+    },
+    {
+      "term": "position",
+      "log_odds": 0.0168,
+      "sd": 0.0124,
+      "z": 1.3593,
+      "p": 0.1741,
+      "p_holm": NaN
+    }
+  ],
+  "manual_seconds_mean": 159.196,
+  "manual_adjustments_mean": 14.226666666666667,
+  "time_to_kept_take_s3_5": {
+    "n": 15,
+    "agent_seconds": 22.526857448107446,
+    "manual_seconds": 162.83555555555554,
+    "saved": [
+      140.3086981074481,
+      127.40324213980462,
+      153.7054438034188
+    ],
+    "pass": true
+  },
+  "O6_parts": {
+    "C3_beats_C1_by_15": true,
+    "C3_within_10_of_C4": true,
+    "less_time": true,
+    "naturalness_noninferior": true
+  },
+  "O6_targets_met": true,
+  "acceptance_by_session": {
+    "1": {
+      "C1": 0.041,
+      "C2": 0.426,
+      "C3": 0.371,
+      "C4": NaN
+    },
+    "2": {
+      "C1": 0.06,
+      "C2": 0.438,
+      "C3": 0.452,
+      "C4": NaN
+    },
+    "3": {
+      "C1": 0.0,
+      "C2": 0.375,
+      "C3": 0.629,
+      "C4": 0.613
+    },
+    "4": {
+      "C1": 0.061,
+      "C2": 0.472,
+      "C3": 0.79,
+      "C4": 0.667
+    },
+    "5": {
+      "C1": 0.033,
+      "C2": 0.375,
+      "C3": 0.643,
+      "C4": 0.727
+    }
+  },
+  "objective_by_condition": {
+    "C1": {
+      "versions": 180,
+      "before_cents": 31.55,
+      "after_cents": 4.0,
+      "in_key_accuracy": 0.917,
+      "naturalness_score": 0.661,
+      "vibrato_penalty": 0.051,
+      "naturalness_rating": 3.617
+    },
+    "C2": {
+      "versions": 180,
+      "before_cents": 31.7,
+      "after_cents": 15.15,
+      "in_key_accuracy": 0.701,
+      "naturalness_score": 0.732,
+      "vibrato_penalty": 0.0,
+      "naturalness_rating": 3.95
+    },
+    "C3": {
+      "versions": 300,
+      "before_cents": 29.4,
+      "after_cents": 17.2,
+      "in_key_accuracy": 0.671,
+      "naturalness_score": 0.735,
+      "vibrato_penalty": 0.001,
+      "naturalness_rating": 3.9
+    },
+    "C4": {
+      "versions": 90,
+      "before_cents": 27.55,
+      "after_cents": 15.9,
+      "in_key_accuracy": 0.679,
+      "naturalness_score": 0.72,
+      "vibrato_penalty": 0.001,
+      "naturalness_rating": 3.822
+    }
+  },
+  "agent_distance_by_session": {
+    "1": {
+      "to_saved": 0.691,
+      "to_true_ideal": 0.657
+    },
+    "2": {
+      "to_saved": 0.599,
+      "to_true_ideal": 0.512
+    },
+    "3": {
+      "to_saved": 0.436,
+      "to_true_ideal": 0.413
+    },
+    "4": {
+      "to_saved": 0.435,
+      "to_true_ideal": 0.348
+    },
+    "5": {
+      "to_saved": 0.403,
+      "to_true_ideal": 0.344
+    }
+  },
+  "acceptance_by_model_s3_5": {
+    "ideal_point": {
+      "C1": 0.071,
+      "C2": 0.412,
+      "C3": 0.641,
+      "C4": 0.758
+    },
+    "logistic": {
+      "C1": 0.031,
+      "C2": 0.571,
+      "C3": 0.793,
+      "C4": 0.517
+    },
+    "threshold": {
+      "C1": 0.0,
+      "C2": 0.226,
+      "C3": 0.638,
+      "C4": 0.719
+    }
+  },
+  "manual_seconds_by_session": {
+    "1": 167.0,
+    "2": 140.5,
+    "3": 160.1,
+    "4": 157.3,
+    "5": 171.1
+  },
+  "participants_detail": [
+    {
+      "code": "P01",
+      "model": "logistic",
+      "singer": "amy",
+      "tracker": "fcpe-onnx",
+      "minutes": 1.1
+    },
+    {
+      "code": "P02",
+      "model": "ideal_point",
+      "singer": "leon",
+      "tracker": "fcpe-onnx",
+      "minutes": 1.0
+    },
+    {
+      "code": "P03",
+      "model": "threshold",
+      "singer": "geniusturtle",
+      "tracker": "fcpe-onnx",
+      "minutes": 1.1
+    },
+    {
+      "code": "P04",
+      "model": "logistic",
+      "singer": "yifen",
+      "tracker": "fcpe-onnx",
+      "minutes": 0.9
+    },
+    {
+      "code": "P05",
+      "model": "ideal_point",
+      "singer": "davidson",
+      "tracker": "fcpe-onnx",
+      "minutes": 1.1
+    },
+    {
+      "code": "P06",
+      "model": "threshold",
+      "singer": "jmzen",
+      "tracker": "fcpe-onnx",
+      "minutes": 1.0
+    },
+    {
+      "code": "P07",
+      "model": "logistic",
+      "singer": "Kenshin",
+      "tracker": "fcpe-onnx",
+      "minutes": 1.1
+    },
+    {
+      "code": "P08",
+      "model": "ideal_point",
+      "singer": "bobon",
+      "tracker": "fcpe-onnx",
+      "minutes": 1.0
+    },
+    {
+      "code": "P09",
+      "model": "threshold",
+      "singer": "fdps",
+      "tracker": "fcpe-onnx",
+      "minutes": 1.0
+    },
+    {
+      "code": "P10",
+      "model": "logistic",
+      "singer": "stool",
+      "tracker": "fcpe-onnx",
+      "minutes": 1.0
+    },
+    {
+      "code": "P11",
+      "model": "ideal_point",
+      "singer": "titon",
+      "tracker": "fcpe-onnx",
+      "minutes": 1.2
+    },
+    {
+      "code": "P12",
+      "model": "threshold",
+      "singer": "khair",
+      "tracker": "fcpe-onnx",
+      "minutes": 1.1
+    },
+    {
+      "code": "P13",
+      "model": "logistic",
+      "singer": "abjones",
+      "tracker": "fcpe-onnx",
+      "minutes": 0.8
+    },
+    {
+      "code": "P14",
+      "model": "ideal_point",
+      "singer": "annar",
+      "tracker": "fcpe-onnx",
+      "minutes": 0.9
+    },
+    {
+      "code": "P15",
+      "model": "threshold",
+      "singer": "ariel",
+      "tracker": "fcpe-onnx",
+      "minutes": 1.0
+    }
+  ],
+  "manual_noise": 0.15,
+  "machine": {
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+    "logical_cores": 4,
+    "threads": 1,
+    "platform": "Linux-6.18.44-fc-v233-x86_64-with-glibc2.39",
+    "python": "3.11.18",
+    "git_commit": "ac6466d012b2d8fb13213223dcaf98efc4ef163e",
+    "packaged_app": false,
+    "time": "2026-11-04T10:24:53+0000",
+    "physical_cores": 4,
+    "ram_gb": 15.7,
+    "versions": {}
+  },
+  "wall_minutes": 4.3,
+  "note": "Simulated participants (O4 simulator) judging real MIR-1K singing through the study runner: acceptance follows the simulator's assumptions; the objective metrics are measured on the real audio."
+}

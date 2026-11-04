@@ -1,0 +1,83 @@
+{
+  "dataset": "CSD (Children's Song Dataset)",
+  "root": "data/raw/CSD",
+  "tracker": "fcpe-onnx",
+  "recordings": 200,
+  "songs": 100,
+  "no_reference": 2,
+  "reference_rule": "last note's pitch class; major if the major third above it is sung longer than the minor third",
+  "checks": {
+    "reference_equals_krumhansl": 0.7374,
+    "song_pairs": 99,
+    "pairs_consistent_with_transposition": 99,
+    "midi_more_than_half_a_semitone_from_heard_pitch": 0
+  },
+  "excerpt": {
+    "n": 198,
+    "exact": 0.8687,
+    "exact_ci95": [
+      0.8145,
+      0.9088
+    ],
+    "exact_ci95_by_song": [
+      0.803,
+      0.9293
+    ],
+    "same_scale": 0.8889,
+    "mirex": 0.8934,
+    "by_language": {
+      "english": 0.8571,
+      "korean": 0.88
+    },
+    "by_reference_mode": {
+      "major": 0.9053,
+      "minor": 0.0
+    }
+  },
+  "whole": {
+    "n": 198,
+    "exact": 0.9242,
+    "exact_ci95": [
+      0.8788,
+      0.9536
+    ],
+    "exact_ci95_by_song": [
+      0.8737,
+      0.9697
+    ],
+    "same_scale": 0.9242,
+    "mirex": 0.9303,
+    "by_language": {
+      "english": 0.8878,
+      "korean": 0.96
+    },
+    "by_reference_mode": {
+      "major": 0.9632,
+      "minor": 0.0
+    }
+  },
+  "excerpt_where_krumhansl_agrees": {
+    "n": 146,
+    "exact": 0.9041,
+    "exact_ci95": [
+      0.8455,
+      0.942
+    ],
+    "exact_ci95_by_song": [
+      0.8356,
+      0.9658
+    ],
+    "same_scale": 0.9315,
+    "mirex": 0.9308,
+    "by_language": {
+      "english": 0.9143,
+      "korean": 0.8947
+    },
+    "by_reference_mode": {
+      "major": 0.9296,
+      "minor": 0.0
+    }
+  },
+  "git_commit": "df3f977202e80495d8c42ef277de0d34a6c7c43a",
+  "O2_key_pass": true
+}
