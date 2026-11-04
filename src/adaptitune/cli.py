@@ -11,6 +11,7 @@
     adaptitune key-excerpts data/raw/MIR-1K --source mir1k --out key_excerpts
     adaptitune key-agreement rater1.csv rater2.csv --out key_labels.csv
     adaptitune eval-keys key_labels.csv --audio-root key_excerpts
+    adaptitune key-eval-csd data/raw/CSD [--out results/keys_csd]
     adaptitune calibrate clean1.wav clean2.wav ...
     adaptitune simulate [--singers 100 --horizon 20]
     adaptitune rtf in.wav [--tracker auto]
@@ -116,6 +117,12 @@ def main(argv=None):
     k.add_argument("--audio-root", default=".")
     k.add_argument("--tracker", default="auto")
     k.add_argument("--out", help="per-excerpt CSV")
+
+    kc = sub.add_parser("key-eval-csd", help="O2: key accuracy on the Children's Song Dataset (keys from its MIDI files)")
+    kc.add_argument("root")
+    kc.add_argument("--out", default="results/keys_csd")
+    kc.add_argument("--tracker", default="auto")
+    kc.add_argument("--limit", type=int)
 
     ke = sub.add_parser("key-eval", help="validate and tune the key estimator on the Essen folk songs (music21 corpus)")
     ke.add_argument("--out", default="results/keys")
@@ -224,6 +231,10 @@ def main(argv=None):
         from .bench.key_labels import evaluate_key_labels
 
         print(json.dumps(evaluate_key_labels(a.labels, a.tracker, a.audio_root, a.out), indent=2, default=float))
+    elif a.cmd == "key-eval-csd":
+        from .bench.key_csd import evaluate_csd
+
+        print(json.dumps(evaluate_csd(a.root, a.out, a.tracker, a.limit), indent=2, default=float))
     elif a.cmd == "key-eval":
         from .bench.keys import evaluate_essen
 

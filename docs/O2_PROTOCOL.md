@@ -6,7 +6,7 @@
 
 1. At least four trackers are reported on both datasets.
 2. The chosen tracker reaches at least 90% raw pitch accuracy on MDB-stem-synth.
-3. Key estimation is correct on at least 75% of about 100 hand-labelled excerpts, each labelled separately by two people.
+3. Key estimation is correct on at least 75% of about 100 hand-labelled excerpts, each labelled separately by two people. No raters were available, so B4 replaces the hand labels with the Children's Song Dataset.
 
 This file fixes the method **before** any real-data result exists. The git history of this file and of the constants in `src/adaptitune/bench/trackers.py` is the record of that.
 
@@ -182,6 +182,29 @@ The estimator's output is not written anywhere a rater can see it.
 * **O2 key criterion: exact accuracy ≥ 75%** on the scored excerpts. It is reported with a Wilson 95% interval, and with a song-resampling interval when songs repeat.
 * Also reported: same-scale accuracy, the MIREX weighted score, accuracy on the excerpts the raters agreed on from the start, rater agreement and kappa, and the tracker used (the chosen O2 tracker, `auto` by default).
 
+
+### B4. Replacement for the hand labels: the Children's Song Dataset (4 November 2026)
+
+This section was written, and its code committed, before the dataset was on disk.
+
+**Why.** Nobody with the ear to label keys was available for B3. The team first checked whether the karaoke backing that MIR-1K stores beside each vocal (the left channel) could stand in for the labels. It cannot. Comparing the pitch classes of MIR-1K's human-labelled vocal pitch (`PitchLabel/`) with the backing's chroma under every transposition, 60 of the 100 key excerpts match best at a transposition other than 0, 39 of them clearly (a correlation gain over 0.3). In those excerpts the singer is not in the stored backing's key, most likely because of karaoke key changes, so the backing's key is not the sung key (`scripts/mir1k_backing_check.py`, `docs/results/o2/mir1k_backing_check.json`). On 4 November 2026 Shahzeb chose to test on a dataset whose keys are fixed by its own note files.
+
+**Data.** The Children's Song Dataset (CSD; Choi et al., ISMIR 2020 late-breaking demo; zenodo.org/records/4785016, CC BY-NC-SA 4.0): 50 Korean and 50 English children's songs, each sung twice in different keys (file names ending in `a` and `b`) by one professional singer. That makes 200 recordings, each with MIDI notes aligned to the singing by hand.
+
+**Reference keys** come from each recording's MIDI notes alone (`adaptitune.bench.key_csd`):
+
+* The tonic is the pitch class of the last note. The mode is major if the major third above the tonic is sung for longer than the minor third, the rule the Essen ground truth uses where its key field gives no mode. A tie leaves the recording without a reference; it is counted, not scored.
+* Three checks are reported and never used to change a reference: Krumhansl–Kessler key finding on the same notes (a profile the app does not use); the two versions of each song must differ by the transposition between their note lists; and the MIDI must lie within half a semitone of the pitch the tracker hears.
+
+**Test items.** Each recording is tested as a whole. Each also gives one excerpt, from the first note to the end of the last note that finishes within 25 s, never reaching the song's last note, so the final tonic is not given away (as with the Essen excerpts). An excerpt must be at least 8 s long; a recording too short for that gives none.
+
+**Scoring.** `adaptitune key-eval-csd data/raw/CSD --out results/keys_csd` runs the app's tracker (`auto`, which is FCPE through ONNX Runtime).
+
+* **O2 key figure: exact accuracy on the excerpts**, against the same 75% target. It is reported with a Wilson 95% interval and with an interval that resamples songs, because each song is sung twice.
+* Also reported: whole recordings, same-scale accuracy, the MIREX score, results by language and by mode, and the excerpts where Krumhansl–Kessler agrees with the reference.
+
+**What this test can and cannot show.** It checks the whole audio-to-key path on real singing, against keys nobody had to judge by ear. It is easier than the planned test. There is one professional singer, the songs are simple and diatonic, and the references come from the notes with the same kind of cue the app also uses (the final note). It says nothing about amateur intonation. The Essen `amateur` condition covers that (73.8% on excerpts, B2), and MIR-1K gives a rough sign. On the 31 excerpts where voice and backing clearly line up, the app's voice-only key matched the backing's key on 18 (58%). The backing's key there is the majority of five Essentia key profiles, which all agree on only 58 of the 100 backings.
+
 ---
 
 ## What still needs the real data
@@ -190,4 +213,5 @@ The estimator's output is not written anywhere a rater can see it.
 |---|---|---|
 | Tracker benchmark | `bench-trackers --dataset mir1k` and `--dataset mdb` (A8), then `choose-tracker` | MIR-1K, MDB-stem-synth, the reference laptop |
 | Key excerpts | `key-excerpts data/raw/MIR-1K --source mir1k` | MIR-1K |
-| Labelling | `tools/key_rater.html`, then `key-agreement`, then `eval-keys` | Two raters, about 1.5 hours each |
+| Key test | `key-eval-csd data/raw/CSD` (B4) | CSD, downloaded on the laptop (Zenodo is blocked in the cloud) |
+| Labelling, if raters become available | `tools/key_rater.html`, then `key-agreement`, then `eval-keys` (B3) | Two raters, about 1.5 hours each |

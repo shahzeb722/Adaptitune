@@ -6,7 +6,7 @@ Status on 3 November 2026. O1, O2's tracker benchmark and O3 now run on the real
 |---|---|---|
 | O1 evaluation corpus | **Met** (VocalSet) | 2.20 h of unique test audio from 9 singers not used in development; 99.5% of kept offsets recovered within 10 cents by a second tracker |
 | O2 pitch trackers | **Met** (MIR-1K, MDB-stem-synth); the laptop speeds still have to confirm the choice | 4 trackers on both sets; the rule chooses FCPE, with RPA 0.941 on MDB-stem-synth (target 0.90) |
-| O2 key estimation | Waiting for the hand labels | 73.8% exact on amateur-like Essen excerpts (target 75% on the hand-labelled set) |
+| O2 key estimation | Waiting for the Children's Song Dataset, which replaces the hand labels | 73.8% exact on amateur-like Essen excerpts (target 75%) |
 | O3 correction | **Met** (VocalSet test singers) | Median error 7.7 cents on notes detuned by under 50 cents (target 25); the median vibrato note keeps its rate within 2% and 97% of its extent |
 | O4 personalization | **Met** in simulation | Thompson sampling reaches 91.4% of the oracle's reward after 20 interactions |
 | O5 offline app | Laptop run pending | The full correction path runs at 0.22× real time on real singing on the cloud VM (target 0.5 on the laptop) |
@@ -49,7 +49,9 @@ Method, fixed before any real-data run: [O2_PROTOCOL.md](O2_PROTOCOL.md). MIR-1K
 
 ## O2: key estimation
 
-**Not scored yet.** O2's key criterion is at least 75% exact on about 100 hand-labelled excerpts, each labelled separately by two people. The 100 MIR-1K excerpts and the rating page are ready (`adaptitune key-excerpts`, `tools/key_rater.html`), and the labels are with the raters. `adaptitune key-agreement` and `eval-keys` score them when they are back. Until then, the evidence is the Essen folksong collection: real melodies, rendered as synthetic singing.
+**Not scored yet.** O2's key criterion is at least 75% exact on about 100 hand-labelled excerpts, each labelled separately by two people. Nobody with the ear to label keys was available, so the test moves to the Children's Song Dataset, whose keys are fixed by its own MIDI notes ([O2_PROTOCOL.md, B4](O2_PROTOCOL.md#b4-replacement-for-the-hand-labels-the-childrens-song-dataset-4-november-2026), written before the data arrived). It runs once the dataset is downloaded; Zenodo is blocked from the cloud machine. Until then, the evidence is the Essen folksong collection: real melodies, rendered as synthetic singing.
+
+* **MIR-1K's karaoke backing cannot replace the labels.** In 60 of the 100 MIR-1K key excerpts, the singer's pitch classes fit the stored backing best at another transposition, 39 of them clearly, so the singer is often not in the backing's key (`scripts/mir1k_backing_check.py`, `docs/results/o2/mir1k_backing_check.json`). On the 31 excerpts where voice and backing clearly line up, the app's voice-only key matched the backing's on 18 (58%). That is a rough sign, not a result, but it suggests the 75% target is hard on amateur singing.
 
 The estimator was rebuilt and tuned on the training volumes of the Essen collection (4,670 songs). It was then tested on 2,486 different songs, rendered as in-tune and amateur singing. Details are in [O2_PROTOCOL.md](O2_PROTOCOL.md#b2-development-and-held-out-test-on-the-essen-folksong-collection).
 

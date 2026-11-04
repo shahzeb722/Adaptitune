@@ -23,7 +23,7 @@ AdaptiTune corrects a recorded vocal the way classic auto-tune does: it detects 
 ```bash
 python3.11 -m venv .venv && source .venv/bin/activate      # Windows: .venv\Scripts\activate
 pip install -e ".[app,dev,study]"
-pytest                                                     # about 115 tests, 2-4 minutes
+pytest                                                     # about 120 tests, 2-4 minutes
 adaptitune-app                                             # the desktop app
 adaptitune correct my_take.wav fixed.wav --key "A minor"   # one file from the command line
 ```
@@ -58,6 +58,7 @@ None of the datasets are redistributed. Download them, then:
 | VocalSet | [zenodo.org/records/1442513](https://zenodo.org/records/1442513) (CC BY 4.0) | O1 corpus (clean in-tune singing) |
 | MIR-1K | [Figshare copy of MIR-1K.rar](https://figshare.com/articles/dataset/MIR-1K_rar/5802891) (797 MB, MD5 `1810d01457ccbb84a0b41c4da53eee74`). The original mirlab.org link now returns 404. Only `Wavfile/` and `PitchLabel/` are needed. | O2 tracker benchmark, O2 key excerpts |
 | MDB-stem-synth | [zenodo.org/records/1481172](https://zenodo.org/records/1481172) | O2 tracker benchmark |
+| Children's Song Dataset (CSD) | [zenodo.org/records/4785016](https://zenodo.org/records/4785016) (CC BY-NC-SA 4.0, 1.9 GB) | O2 key test, in place of the hand labels |
 | MedleyDB (optional) | access request at medleydb.weebly.com | More O1 singers |
 
 ```bash
@@ -70,6 +71,7 @@ adaptitune build-corpus data/corpus --source vocalset --root data/raw/VocalSet -
 adaptitune corpus-stats data/corpus                                         # O1_test_hours_ok, O1_singers_disjoint
 adaptitune verify-corpus data/corpus --tracker fcpe                         # every kept offset re-measured
 adaptitune key-excerpts data/raw/MIR-1K --source mir1k --out key_excerpts   # then label with tools/key_rater.html
+adaptitune key-eval-csd data/raw/CSD --out results/keys_csd                  # O2 key test on CSD (docs/O2_PROTOCOL.md, B4)
 python scripts/calibrate_quality.py data/corpus --tracker fcpe             # WORLD quality-check threshold, training singers only
 adaptitune eval-corrector data/corpus --tracker fcpe --measure-tracker pyin # O3 on the test singers (add --shard k/n to split it)
 ```

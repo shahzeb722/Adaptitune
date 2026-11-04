@@ -1,0 +1,34 @@
+{
+  "excerpts": 100,
+  "best_shift_counts": {
+    "-5": 3,
+    "-4": 10,
+    "-3": 1,
+    "-2": 4,
+    "-1": 3,
+    "0": 40,
+    "1": 5,
+    "2": 4,
+    "3": 1,
+    "4": 4,
+    "5": 22,
+    "6": 3
+  },
+  "voice_transposed_against_backing": 60,
+  "clearly_transposed (best shift not 0, correlation gain over 0.3)": 39,
+  "aligned (best shift 0, correlation at least 0.5)": 31,
+  "essentia": {
+    "profiles": [
+      "temperley",
+      "krumhansl",
+      "edma",
+      "bgate",
+      "shaath"
+    ],
+    "all_five_profiles_agree": 58,
+    "app_matches_backing_key_all": "25/100",
+    "app_matches_backing_key_aligned": "18/31",
+    "app_matches_backing_key_transposed": "4/60",
+    "tracker": "fcpe-onnx"
+  }
+}
