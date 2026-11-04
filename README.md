@@ -23,7 +23,7 @@ AdaptiTune corrects a recorded vocal the way classic auto-tune does: it detects 
 ```bash
 python3.11 -m venv .venv && source .venv/bin/activate      # Windows: .venv\Scripts\activate
 pip install -e ".[app,dev,study]"
-pytest                                                     # about 140 tests, 5-10 minutes
+pytest                                                     # about 150 tests, 10-15 minutes
 adaptitune-app                                             # the desktop app
 adaptitune correct my_take.wav fixed.wav --key "A minor"   # one file from the command line
 ```
@@ -86,7 +86,8 @@ adaptitune eval-corrector data/corpus --tracker fcpe --measure-tracker pyin # O3
 * **Manual:** you set the four sliders yourself and save the result as your setting (FR5). The time you spend and the number of adjustments are logged for the study.
 * The pitch view and the table show how far each note was off before and after (FR6).
 * The profile can be reset or exported (FR7). It lives in `~/.adaptitune/profile.sqlite`; set `ADAPTITUNE_HOME` to move it.
-* Recording needs `sounddevice` and a microphone, while importing works without them.
+* Recording needs `sounddevice` and a microphone, while importing works without them. A file can also be dropped on the window.
+* The look follows Apple's design guidelines, in light and dark (View → Appearance; *Auto* follows the system). Controls that would clash with running work are greyed out, a result for an earlier take is dropped, and an unexpected error is logged to `~/.adaptitune/logs/` with a plain message instead of closing the app ([docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)).
 * **Study → Run a study session…** runs one session of the O6 user study: three takes, twelve blind versions with keep and naturalness questions, a break, and the hand-tuning task. The plan, consent form and session script are in [docs/O6_PROTOCOL.md](docs/O6_PROTOCOL.md) and `docs/study/`. `scripts/o6_dry_run.py` runs the whole study through the same code with simulated participants judging real MIR-1K singing.
 * **Help → Check this installation** runs every feature through the window with the network blocked, in a throwaway profile. **Help → Speed test** times the whole correction path on the MIR-1K folder (O5). Both keep a JSON report, and both run from the command line: `AdaptiTune.exe --self-test`, `AdaptiTune.exe --speed-test E:\FYP\MIR1K` (in a checkout, `python -m adaptitune.app.launch` in place of the exe).
 

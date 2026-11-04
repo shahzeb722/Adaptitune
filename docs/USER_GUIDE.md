@@ -18,17 +18,29 @@ To build it yourself instead, run `packaging\build_windows.bat` from the reposit
 | Step | What to do | Requirement |
 |---|---|---|
 | Choose the singer | Pick a name under **Singer**, or **New singer…**. Each singer has their own profile. | |
-| Bring in a vocal | **Import vocal…** (WAV, FLAC, OGG, MP3 or AIFF), or **● Record** and click it again to stop. Recording needs a microphone. Use a dry solo vocal, not a full mix. | FR1 |
+| Bring in a vocal | **Import vocal…** (WAV, FLAC, OGG, MP3 or AIFF), drag the file onto the window, or **● Record** and click it again to stop. Recording needs a microphone. Use a dry solo vocal of up to 10 minutes, not a full mix. | FR1 |
 | Set the key | Leave **Key** on *Auto-detect*, or choose the key yourself. The detected key is shown next to the box. | FR2 |
-| Correct | **Personalized → Correct with my profile**. Then **▶ Original** and **▶ Corrected** to compare, **■ Stop** to stop, **Save WAV…** to keep the file. | FR3 |
-| Tell it what you think | **👍 Keep** or **👎 Discard**, a star rating, or **Compare A / B → Make two versions**, listen to both and click **I prefer A** or **I prefer B**. Every judgment updates your profile. | FR4 |
-| Set it by hand | **Manual**: correction strength, retune speed, snap to key, and how much vibrato to keep. **Apply** to hear it, **Save as my setting** to keep it. | FR5 |
+| Correct | **Personalized → Correct with my profile**. Then **▶ Original** and **▶ Corrected** to compare, and **■ Stop** to stop. **Save WAV…** above the pitch view saves the version on show. | FR3 |
+| Tell it what you think | **👍 Keep** or **👎 Discard**, or a star rating. Or **Compare A / B → Make two versions**, listen to both and click **I prefer A** or **I prefer B**. Every judgment updates your profile, and each version can be judged once. | FR4 |
+| Set it by hand | **Manual**: correction strength, retune speed, snap to key, and how much vibrato to keep. **Apply** to hear it, then **Save as my setting** to keep it. | FR5 |
 | See how far each note was off | The pitch view and the table below it show every note's error in cents before and after correction. | FR6 |
-| Start again or take your profile with you | **Reset profile** or **Export profile…** (a JSON file). | FR7 |
+| Start again or take your profile with you | **Reset** (it asks first) or **Export…** (a JSON file), at the top right. | FR7 |
+
+While the app is working on something, the buttons that would start something else are greyed out until it finishes.
+
+## Light and dark, and shortcuts
+
+The app follows Windows' light or dark mode. **View → Appearance** sets it to **Light** or **Dark** instead. The app remembers that choice, the last singer, the last folder you used, and the window's size and position.
+
+| Shortcut | Does |
+|---|---|
+| Ctrl+O | Import a vocal |
+| Ctrl+R | Start or stop recording |
+| Ctrl+S | Save the version on show as a WAV file |
 
 ## Where your data is
 
-Everything the app learns is in one file, `C:\Users\<you>\.adaptitune\profile.sqlite`. **Help → Where my data is stored** opens that folder. Corrected recordings are saved only where you save them. Set the `ADAPTITUNE_HOME` environment variable to keep the profile somewhere else.
+Everything the app learns is in one file, `C:\Users\<you>\.adaptitune\profile.sqlite`. **Help → Where my data is stored** opens that folder. Corrected recordings are saved only where you save them. The same folder holds `settings.ini` (the choices above) and `logs\adaptitune.log`, which records anything that went wrong. Set the `ADAPTITUNE_HOME` environment variable to keep all of this somewhere else.
 
 ## Run a study session (O6)
 
@@ -60,6 +72,8 @@ The window does not open for these. Each writes its report to the `--out` file a
 
 ## If something goes wrong
 
+* **"Something went wrong, but AdaptiTune is still running."** The app caught an unexpected error and wrote the details to `C:\Users\<you>\.adaptitune\logs\adaptitune.log`. Please send that file to the team. It holds no recordings and nothing from your profile, only what went wrong and where, with a file's path if a file was involved.
+* **A take is refused as too long.** The app corrects takes of up to 10 minutes, and a study take may be up to 45 seconds. Cut out the part you want first.
 * **The Record button is greyed out.** No microphone was found. Importing a file still works.
 * **No sound.** Check the Windows output device; the app plays through the default one.
 * **A file will not import.** Convert it to WAV first. M4A and other AAC files are not supported.

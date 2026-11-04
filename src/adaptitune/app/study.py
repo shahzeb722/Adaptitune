@@ -13,7 +13,7 @@ import math
 import time
 from pathlib import Path
 
-from PySide6.QtCore import QThreadPool, QTimer
+from PySide6.QtCore import Qt, QThreadPool, QTimer
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -50,6 +50,7 @@ from .jobs import Jobs, UserMessage
 from .widgets import Card, ChoiceRow, SettingsPanel, button, label
 
 NATURALNESS = [("1", 1), ("2", 2), ("3", 3), ("4", 4), ("5", 5)]
+MAX_TAKE_S = 45.0  # the protocol asks for phrases of 10 to 20 seconds
 
 
 class StudyWindow(QDialog):
@@ -79,6 +80,7 @@ class StudyWindow(QDialog):
         self.manual_seconds: float | None = None
         self.manual_adjustments = 0
         self.manual_applied = False
+        self.manual_done = False
         self.timer = QTimer(self)
         self.timer.setInterval(1000)
         self.timer.timeout.connect(self._tick)
@@ -120,7 +122,7 @@ class StudyWindow(QDialog):
         self.take_list.setMaximumHeight(96)
         takes.box.addWidget(self.take_list)
         row = QHBoxLayout()
-        self.btn_rec_take = button("● Record a take", "secondary")
+        self.btn_rec_take = button("● Record a take", "record")
         self.btn_rec_take.setCheckable(True)
         self.btn_rec_take.toggled.connect(self._record_take)
         self.btn_rec_take.setEnabled(self.recorder is not None)
@@ -181,6 +183,10 @@ class StudyWindow(QDialog):
         listen.box.addLayout(row)
         self.preparing = label("Preparing this version…", "caption")
         listen.box.addWidget(self.preparing)
+        self.btn_retry = button("Try again", "secondary", "Make this version again")
+        self.btn_retry.clicked.connect(lambda: self._show_trial(self.i))
+        self.btn_retry.setVisible(False)
+        listen.box.addWidget(self.btn_retry)
         v.addWidget(listen)
         ask = Card("Your judgment")
         ask.box.addWidget(label("Would you keep this version of your take?", "body"))
@@ -261,12 +267,18 @@ class StudyWindow(QDialog):
     def _done_page(self) -> QWidget:
         page = QWidget()
         v = QVBoxLayout(page)
+        v.setSpacing(12)
         v.addStretch(1)
+        mark = label("✓", "donecheck", wrap=False)
+        mark.setAlignment(Qt.AlignCenter)
+        v.addWidget(mark)
         v.addWidget(label("Thank you!", "title"))
         self.done_text = label("", "subtitle")
         v.addWidget(self.done_text)
+        details = Card("For the researcher")
         self.done_details = label("", "caption")
-        v.addWidget(self.done_details)
+        details.box.addWidget(self.done_details)
+        v.addWidget(details)
         row = QHBoxLayout()
         row.addStretch(1)
         b = button("Close", "primary")
@@ -308,6 +320,10 @@ class StudyWindow(QDialog):
         if audio.duration < 0.5:
             self._error("That take is shorter than half a second. Please record it again.")
             return
+        if audio.duration > MAX_TAKE_S:
+            self._error(f"That take is {audio.duration:.0f} seconds long. The study uses short phrases of 10 to 20 "
+                        "seconds; please record or choose a shorter one.")
+            return
         self.takes.append(audio)
         self.take_list.addItem(f"Take {len(self.takes)} · {audio.duration:.1f} s" + (f" · {name}" if name else ""))
         self._refresh_setup()
@@ -340,13 +356,22 @@ class StudyWindow(QDialog):
             self.btn_rec_take.setText("■ Stop recording")
         else:
             self.btn_rec_take.setText("● Record a take")
-            self._add_take(self.recorder.stop())
+            try:
+                audio = self.recorder.stop()
+            except Exception as e:  # the microphone went away mid-take
+                self._error(f"The recording stopped with an error: {e}")
+            else:
+                self._add_take(audio)
         self._refresh_setup()
 
     def _start(self):
         code = self._code()
         n = next_session(code, self.root) if code else None
-        if code is None or n is None or not self.consent.isChecked() or len(self.takes) != TAKES_PER_SESSION:
+        if code is None or n is None or not self.consent.isChecked() or len(self.takes) != TAKES_PER_SESSION or len(self.jobs):
+            return
+        if self.player is None and self.show_errors:
+            self._error("AdaptiTune found no audio output, so the participant could not hear the versions. "
+                        "Connect the study headphones and open this window again.")
             return
         api = AdaptiveSession(code, self.store, self.corrector)
         try:
@@ -363,10 +388,25 @@ class StudyWindow(QDialog):
             run.start()
             return run.render(0)
 
-        for w in (self.btn_start, self.code, self.consent, self.btn_import_take, self.btn_rec_take, self.btn_remove_take):
-            w.setEnabled(False)
+        self._lock_setup(True)
         self.session_label.setText("Analysing the takes…")
-        self.jobs.start(prepare, lambda _: self._show_trial(0), self._failed)
+        self.jobs.start(prepare, lambda _: self._show_trial(0), self._setup_failed)
+
+    def _lock_setup(self, locked: bool) -> None:
+        for w in (self.code, self.consent, self.key_box, self.btn_export, self.btn_withdraw):
+            w.setEnabled(not locked)
+        if locked:
+            for w in (self.btn_start, self.btn_import_take, self.btn_rec_take, self.btn_remove_take):
+                w.setEnabled(False)
+        else:
+            self._refresh_setup()
+
+    def _setup_failed(self, text: str):
+        """The takes could not be analysed: nothing was judged, so start again from the setup."""
+        self.run = None
+        self._lock_setup(False)
+        self._code_changed()
+        self._error(text)
 
     # ------------------------------------------------------------------ trials
     def _show_trial(self, i: int):
@@ -379,23 +419,40 @@ class StudyWindow(QDialog):
         self.keep_row.clear()
         self.nat_row.clear()
         self.played, self.first_play = False, None
+        self.btn_retry.setVisible(False)
+        self.preparing.setText("Preparing this version…")
+        self._wait_ready(i)
+
+    def _wait_ready(self, i: int):
+        if self.pages.currentIndex() != self.PAGE_TRIAL or self.i != i:
+            return
         if i in self.run.results:
             self._ready()
+            return
+        self._refresh_trial()
+        if len(self.jobs):  # it is being made already, while the last one was judged
+            QTimer.singleShot(200, lambda: self._wait_ready(i))
         else:
-            self._refresh_trial()
-            self.jobs.start(self.run.render, lambda _: self._ready(), self._failed, i)
+            self.jobs.start(self.run.render, lambda _: self._wait_ready(i), self._render_failed, i)
+
+    def _render_failed(self, text: str):
+        self.preparing.setText("This version could not be made.")
+        self.btn_retry.setVisible(True)
+        self._error(text)
 
     def _ready(self):
         self._refresh_trial()
         nxt = self.i + 1
         # make the next version while this one is judged, unless the agent must hear this judgment first
         if nxt < len(self.run.trials) and nxt not in self.run.results and self.run.can_render(nxt) and not len(self.jobs):
-            self.jobs.start(self.run.render, lambda _: None, self._failed, nxt)
+            self.jobs.start(self.run.render, lambda _: None, lambda text: None, nxt)  # a failure shows when it is needed
 
     def _refresh_trial(self):
         ready = self.run is not None and self.i in self.run.results
         self.preparing.setVisible(not ready)
         self.btn_play.setEnabled(ready)
+        for row in (self.keep_row, self.nat_row):  # answer after listening, not before
+            row.setEnabled(ready and self.played)
         self.btn_next.setEnabled(ready and self.played and self.keep_row.value() is not None and self.nat_row.value() is not None)
 
     def _play_version(self):
@@ -437,7 +494,7 @@ class StudyWindow(QDialog):
     def _start_manual(self):
         self.pages.setCurrentIndex(self.PAGE_MANUAL)
         self.manual_started = time.time()
-        self.manual_adjustments, self.manual_applied = 0, False
+        self.manual_adjustments, self.manual_applied, self.manual_done = 0, False, False
         self.rate_row.clear()
         for w in (self.rate_label, self.rate_row):
             w.setVisible(False)
@@ -465,15 +522,25 @@ class StudyWindow(QDialog):
         self.btn_apply.setEnabled(False)
 
         def done(res):
-            self.btn_apply.setEnabled(self._left() > 0)
             self.manual_applied = True
+            if self.manual_done:  # time ran out while it was being made: the setting is taken already
+                return
+            self.btn_apply.setEnabled(self._left() > 0)
             self.btn_happy.setEnabled(True)
             if self.player:
                 self.player.play(res.audio)
 
-        self.jobs.start(self.run.manual, done, self._failed, settings)
+        def failed(text):
+            if not self.manual_done:
+                self.btn_apply.setEnabled(self._left() > 0)
+            self._error(text)
+
+        self.jobs.start(self.run.manual, done, failed, settings)
 
     def _manual_happy(self):
+        if self.manual_done:
+            return
+        self.manual_done = True
         self.timer.stop()
         self.manual_seconds = min(time.time() - self.manual_started, MANUAL_LIMIT_S)
         for w in (self.manual_panel, self.btn_apply, self.btn_happy):
@@ -494,15 +561,20 @@ class StudyWindow(QDialog):
         self.done_text.setText(f"Session {n} of {N_SESSIONS} is complete." + ("" if n == N_SESSIONS else " See you next time."))
         cons = summary["consistency"]
         self.done_details.setText(
-            f"For the researcher: {summary['flagged_trials']} judgments flagged; agreement on repeats "
-            f"{'n/a' if math.isnan(cons) else f'{cons:.0%}'}; {summary['minutes']} minutes. Saved in {self.root / 'sessions'}.")
+            f"{summary['flagged_trials']} judgments flagged; agreement on repeats "
+            f"{'n/a' if math.isnan(cons) else f'{cons:.0%}'}; {summary['minutes']} minutes. Saved in {self.root / 'sessions'}. "
+            "Copy this line into the study log.")
         self.pages.setCurrentIndex(self.PAGE_DONE)
 
     # ------------------------------------------------------------------ researcher tools
     def _export(self):
         folder = QFileDialog.getExistingDirectory(self, "Export the study data to")
         if folder:
-            paths = export(self.root, Path(folder) / "adaptitune_study_export")
+            try:
+                paths = export(self.root, Path(folder) / "adaptitune_study_export")
+            except OSError as e:
+                self._error(f"The study data could not be written to {folder}: {e.strerror or e}")
+                return
             QMessageBox.information(self, "Study data exported", "Wrote " + ", ".join(p.name for p in paths.values())
                                     + f" to\n{paths['trials'].parent}\n\nAnalyse with: adaptitune study-analyze trials.csv --manual manual.csv")
 
@@ -518,7 +590,12 @@ class StudyWindow(QDialog):
         if QMessageBox.question(self, "Withdraw a participant", f"Delete every session, take and learned setting of {code}? "
                                 "This cannot be undone.") != QMessageBox.Yes:
             return
-        n = withdraw(code, self.store, self.root)
+        try:
+            n = withdraw(code, self.store, self.root)
+        except OSError as e:
+            self._error(f"Not everything of {code} could be deleted: {e}. Close any program that has the files open "
+                        "and withdraw again.")
+            return
         QMessageBox.information(self, "Participant withdrawn", f"Deleted {n} files and the learned profile of {code}.")
         self._code_changed()
 
@@ -535,6 +612,12 @@ class StudyWindow(QDialog):
             box.setText("Something went wrong. Please save the details below and send them to the AdaptiTune team.")
             box.setDetailedText(text)
         box.exec()
+
+    def keyPressEvent(self, e):  # noqa: N802 (Qt naming)
+        if e.key() == Qt.Key_Escape:  # a dialog closes on Esc without asking; a session must ask first
+            self.close()
+            return
+        super().keyPressEvent(e)
 
     def in_progress(self) -> bool:
         return self.run is not None and bool(self.run.trials) and not self.finished

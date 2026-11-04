@@ -23,6 +23,9 @@ from ..correction.settings import RETUNE_MS_LEVELS, CorrectionSettings
 def styled(widget, role: str):
     """Tag a widget with a style role (title, subtitle, caption, card, primary, ...)."""
     widget.setProperty("role", role)
+    if widget.style() is not None:  # a role changed after the widget was shown needs a re-polish
+        widget.style().unpolish(widget)
+        widget.style().polish(widget)
     return widget
 
 
@@ -62,7 +65,7 @@ class ChoiceRow(QWidget):
         super().__init__(parent)
         lay = QHBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
-        lay.setSpacing(0)
+        lay.setSpacing(1)  # a hairline between segments
         self.group = QButtonGroup(self)
         self.group.setExclusive(True)
         self.values = []
@@ -74,6 +77,7 @@ class ChoiceRow(QWidget):
             self.group.addButton(b, i)
             self.values.append(value)
             lay.addWidget(b)
+        lay.addStretch(1)
         self.group.idClicked.connect(lambda i: self.chosen.emit(self.values[i]))
 
     def value(self):
@@ -94,6 +98,43 @@ class ChoiceRow(QWidget):
 
     def buttons(self) -> list[QPushButton]:
         return self.group.buttons()
+
+
+class StarRating(QWidget):
+    """One to five stars. Clicking a star rates the version and fills the stars up to it."""
+
+    rated = Signal(int)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        lay = QHBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(0)
+        self._value = 0
+        self.stars: list[QPushButton] = []
+        for i in range(1, 6):
+            b = styled(QPushButton("☆"), "star")
+            b.setCursor(Qt.PointingHandCursor)
+            b.setToolTip(f"{i} star{'s' if i > 1 else ''}")
+            b.setAccessibleName(f"Rate {i} out of 5")
+            b.clicked.connect(lambda _=False, i=i: self._click(i))
+            lay.addWidget(b)
+            self.stars.append(b)
+
+    def _click(self, i: int) -> None:
+        self.set_value(i)
+        self.rated.emit(i)
+
+    def value(self) -> int:
+        return self._value
+
+    def set_value(self, i: int) -> None:
+        self._value = i
+        for k, b in enumerate(self.stars, 1):
+            b.setText("★" if k <= i else "☆")
+
+    def clear(self) -> None:
+        self.set_value(0)
 
 
 class SettingsPanel(QWidget):
