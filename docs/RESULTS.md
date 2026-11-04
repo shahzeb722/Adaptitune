@@ -1,6 +1,6 @@
 # Results
 
-Status on 4 November 2026. O1, both parts of O2 and O3 now run on real data. O2's key test uses the Children's Song Dataset in place of the hand labels, because nobody was available to label keys by ear. O4 and O6 are simulations by design, and O5's speed has to be measured on the reference laptop. The earlier synthetic-only results are kept in the appendix as code checks.
+Status on 4 November 2026. O1, both parts of O2 and O3 now run on real data. O2's key test uses the Children's Song Dataset in place of the hand labels, because nobody was available to label keys by ear. O4 and O6 are simulations by design. The O5 app is built for Windows in CI and passes its own checks there, but its speed has to be measured on the reference laptop. The earlier synthetic-only results are kept in the appendix as code checks.
 
 | Objective | Status | Main number |
 |---|---|---|
@@ -9,7 +9,7 @@ Status on 4 November 2026. O1, both parts of O2 and O3 now run on real data. O2'
 | O2 key estimation | **Met** on the Children's Song Dataset, which replaced the hand labels. One professional singer, so it is easier than amateur singing | 86.9% exact on excerpts that stop before each song's last note (target 75%; 95% CI 80.3–92.9, resampling songs) |
 | O3 correction | **Met** (VocalSet test singers) | Median error 7.7 cents on notes detuned by under 50 cents (target 25); the median vibrato note keeps its rate within 2% and 97% of its extent |
 | O4 personalization | **Met** in simulation | Thompson sampling reaches 91.4% of the oracle's reward after 20 interactions |
-| O5 offline app | Laptop run pending | The full correction path runs at 0.22× real time on real singing on the cloud VM (target 0.5 on the laptop) |
+| O5 offline app | Built for Windows and checked there; laptop run pending | Every feature passes in the packaged Windows app with the network blocked; the full correction path runs at 0.22× real time on real singing on the cloud VM (target 0.5 on the laptop) |
 | O6 user study | Design ready | Power simulation below |
 
 **Machine.** The real-data runs used a shared 4-core Intel Xeon @ 2.8 GHz cloud VM, CPU only, with several jobs running side by side at 1 thread each. Accuracy does not depend on that, but speed does, so the speed numbers below are not the reference laptop's. `scripts/o2_laptop_speed.py` measures them there.
@@ -192,13 +192,40 @@ An exploration scale of 0.5 was kept because larger scales gain about one point 
 
 ## O5: offline application
 
-| | Value |
+The app is a PySide6 window over the same pipeline and agent as the experiments. `packaging/adaptitune.spec` makes it a one-folder Windows program that needs no Python, PyTorch or internet connection, and the `windows-app` workflow builds it on every push. Two checks are built into the app under Help. Both also run from the command line and write JSON:
+
+* **Check this installation** (`AdaptiTune.exe --self-test`) drives every feature through the window, the way the buttons do, on a 7 s detuned take. Every socket call is blocked and recorded, and the profile is a throwaway folder (`adaptitune/app/checks.py`).
+* **Speed test** (`AdaptiTune.exe --speed-test MIR1K_FOLDER`) times the full correction path at 4 threads, best of 3, on the first 64 s of MIR-1K vocals, the same audio as the cloud run below. The report names the CPU, memory and build.
+
+The workflow removes PyTorch from the machine after the build, runs both checks on the packaged exe, and keeps the build as the `AdaptiTune-windows` artifact. The tests run the same self-test on every push (`tests/test_app.py`), along with FR1–FR7 on the session layer with sockets blocked (`tests/test_session_study.py`). [USER_GUIDE.md](USER_GUIDE.md) says how to install it and run the checks on the laptop.
+
+| Requirement | How it is checked | Result (packaged app) |
+|---|---|---|
+| FR1 record or import a vocal | The self-test imports a WAV through the same path as **Import vocal…**. Recording needs a microphone, so the self-test only reports whether there is one, and `tests/test_app.py` covers Record without one | Pass. Neither machine had a microphone |
+| FR2 key by hand or detected | Detects the take's key, then sets G major by hand | Pass: C major detected |
+| FR3 correct, play back, compare | Corrects with the profile's settings. Playback (Qt Multimedia) is checked by ear | Pass |
+| FR4 keep, rate or pick A/B | A keep, a rating and an A/B pick | Pass: 3 judgments stored |
+| FR5 tune the four settings, save | Strength 50%, apply, save, then the profile is read back from disk | Pass |
+| FR6 per-note pitch error | One table row per note; median error before and after | Pass: 9 notes, 30 cents before, 13 after (cloud) and 16 after (Windows). The agent samples its settings, so the after-error varies a little |
+| FR7 reset or export the profile | Export to JSON, then reset | Pass |
+| NFR1 no internet | Every socket call blocked and recorded for the whole self-test | Pass: no connection attempted |
+| NFR2 RTF ≤ 0.5 on the laptop | The speed test on the MIR-1K folder | 0.17 on the cloud VM. Laptop pending |
+| NFR3 data stays on the device | Lists every file the self-test wrote | Pass: the profile is one SQLite file in the profile folder, and with no connection (NFR1) nothing leaves the device |
+| NFR4 Windows 10 or later | The workflow builds the exe on Windows and runs both checks on it | Pass on Windows Server 2025 (build 26100) |
+
+"Pass" means the packaged app passed on the cloud VM (Linux) and on GitHub's Windows runner, both from commit 12e292c. The reference laptop still has to give three results: the speed test on the MIR-1K folder (NFR2), every feature with Wi-Fi off (NFR1), and a recording through its microphone (FR1). Records and the machines they came from: `docs/results/o5/app_checks/`.
+
+| Speed | Value |
 |---|---|
-| Pitch tracker | FCPE through ONNX Runtime, so the app needs no PyTorch |
+| Full-pipeline RTF on real singing | **0.22** on a quiet 4-core 2.8 GHz cloud VM at 4 threads, 3 November (`docs/results/o5/cloud_pipeline_rtf.json`): analysis 0.16 (tracker, WORLD analysis and the quality check), planning 0.001, shifting 0.06. WORLD took 99% of the corrected audio. |
+| The same input through the app's speed test | **0.17** packaged and 0.18 run from source (0.168 and 0.176), on a 4-core 2.1 GHz cloud VM, 4 November, so packaging costs nothing. That VM is a different one from 3 November's, so the two days' numbers are not a trend. |
+| Windows runner, synthetic singing | 0.16 (AMD EPYC, 4 vCPUs). Synthetic voices send half the audio through PSOLA (A4), so this only shows that the Windows build runs at a normal speed. |
+| First analysis after installing | The self-test's 7 s take took 17 s to analyse at the first launch on Windows and 19 s on the cloud VM, against 2 s at the second launch on the cloud VM: librosa's numba code is compiled for the processor once and kept. The speed test reports the best of 3 runs, so this is not in it. |
+| Target | RTF ≤ 0.5 on the reference laptop: Help → Speed test on the MIR-1K folder, or `scripts/o2_laptop_speed.py --pipeline-only` in a checkout |
+| Pitch tracker | FCPE through ONNX Runtime, so the app needs no PyTorch. The Windows build exports it in CI and checks the export against PyTorch: 0.004 cents apart on a 220 Hz tone |
 | Quality check | Calibrated on real singing. The WORLD threshold is the 95th percentile of WORLD's copy-synthesis distortion over 135 clean takes from the 9 training singers: 20.93 (21.58 before WORLD took the tracker's pitch, see O3), in the code's own mel-cepstral distance, which is not comparable with SPTK's. Records in `docs/results/o3/quality_calibration_*.json`. In the O3 run it sent 91.6% of the corrected test audio through WORLD and the rest through PSOLA. |
-| Full-pipeline RTF on real singing | **0.22** on a quiet 4-core cloud VM at 4 threads, on 64 s of MIR-1K vocals with FCPE through ONNX Runtime (`docs/results/o5/`): analysis 0.16 (tracker, WORLD analysis and the quality check), planning 0.001, shifting 0.06. WORLD took 99% of the corrected audio. The laptop number comes from `scripts/o2_laptop_speed.py`; `--pipeline-only` runs just this step. |
-| Target | RTF ≤ 0.5 on the reference laptop |
-| Offline test | `tests/test_session_study.py::test_full_flow_offline` runs FR1–FR7 with all socket calls blocked |
+
+**What driving the app found.** The unit tests passed while the app itself did not work. Every button that runs in the background (import, correct, A/B, apply) stayed on "Analysing…": PySide discards a job's finished signal when nothing references the job, so the window now holds each running job. Drawing a long take's pitch curve crashed the app with "deallocating None", because PySide6 6.12.0 under Python 3.11 drops a reference to `None` on every call that returns nothing; PySide6 is pinned below 6.12. The packaged app looked for its FCPE model next to the exe, where PyInstaller 6 no longer puts data files, so it fell back to pYIN, which is too slow for NFR2; the self-test now fails a packaged build that does not run the bundled FCPE. Smaller fixes: Record with no microphone left the button stuck, and the import dialog offered m4a, which the bundled libsndfile cannot read. Each fix has a test in `tests/test_app.py`.
 
 ## O6: study design (power simulation)
 

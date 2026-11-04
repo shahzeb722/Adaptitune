@@ -13,7 +13,11 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 60
     steps:
+      # On a pull request, build the branch's own commit (not GitHub's merge commit), so the
+      # commit the app reports under Help > About is one that exists on the branch
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"

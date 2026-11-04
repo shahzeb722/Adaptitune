@@ -217,9 +217,10 @@ def speed_test(src: str | Path | None = None, repeats: int = 3, tracker: str = "
 
 
 def _about() -> dict:
-    from ..machine import build_info
+    from ..machine import build_info, version
 
-    return {"platform": platform.platform(), "packaged_app": bool(getattr(sys, "frozen", False)), "build": build_info()}
+    return {"platform": platform.platform(), "packaged_app": bool(getattr(sys, "frozen", False)), "build": build_info(),
+            "pyside6": version("PySide6"), "onnxruntime": version("onnxruntime")}
 
 
 def summary(report: dict, kind: str) -> str:

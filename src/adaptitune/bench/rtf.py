@@ -67,7 +67,7 @@ def measure(src: str | Path | Audio | None = None, tracker: str = "auto", repeat
         runs.append(time.perf_counter() - t0)
         stages = res.seconds
     best = min(runs)
-    info = machine_info(default_threads(), ("numpy", "scipy", "librosa", "onnxruntime", "pyworld", "praat-parselmouth"))
+    info = machine_info(default_threads(), ("numpy", "scipy", "librosa", "onnxruntime", "pyworld", "praat-parselmouth", "PySide6"))
     return {
         "tracker": c.tracker.name,
         "audio_seconds": round(audio.duration, 2),

@@ -18,6 +18,13 @@
 * **Thompson sampling** uses half the posterior spread (exploration scale 0.5). The A/B rival is the agent's current best guess, the same rule in the app and in the simulation. The exploration scale and the rating weight were chosen on development singers (`scripts/tune_agent.py`, seed 1). The O4 results use a different set of singers (seed 0).
 * **Baselines:** UCB, ε-greedy, fixed setting and population only. Discounted Thompson sampling is the extended-work variant for drift. The first design is kept as the ablation `thompson_linear`: a linear model of *r* itself, which reached only 83% of the oracle.
 
+## The desktop app
+
+* **`app/main.py`** is a PySide6 window over `AdaptiveSession`. Analysis and correction run on a `QThreadPool`, and each job's result comes back to the window through a queued signal. The window holds every running job in `MainWindow._jobs`, because PySide discards the signal of a job that nothing references; before that, every button stayed on "Analysing…".
+* **`app/checks.py`** holds the two checks under Help. The window runs each one as a separate process of the same program (`check_command`), so the speed test can set its thread count before NumPy loads and the self-test's throwaway profile never touches the open session.
+* **`app/launch.py`** is the packaged app's entry point. `--self-test` and `--speed-test` run a check without a window and write JSON; anything else opens the window. A windowed Windows exe has no console, so every failure goes into the JSON report instead of an error dialog that would wait for a click.
+* **`packaging/adaptitune.spec`** bundles FCPE's ONNX export in `_internal/models` and records the commit in `build_info.json` (Help → About and every check report). The pins and their reasons: PySide6 below 6.12, because 6.12.0 under Python 3.11 drops a reference to `None` on every call that returns nothing and the app crashes; PyInstaller 6.22.3, because 6.11 cannot package NumPy 2.4; setuptools below 81 with `backports.tarfile`, because pyworld still imports `pkg_resources`.
+
 ## Who owns what (proposal section 7)
 
 | Stream | Owner | Modules |

@@ -11,7 +11,7 @@ import os
 import subprocess
 import time
 
-from PyInstaller.utils.hooks import collect_data_files, collect_submodules
+from PyInstaller.utils.hooks import collect_data_files, collect_submodules, copy_metadata
 
 hidden = collect_submodules("adaptitune") + ["onnxruntime", "pyworld", "parselmouth", "soundfile", "sounddevice", "psutil",
                                              # pyworld imports pkg_resources, whose vendored jaraco.context needs
@@ -19,6 +19,9 @@ hidden = collect_submodules("adaptitune") + ["onnxruntime", "pyworld", "parselmo
                                              "backports.tarfile"]
 
 datas = collect_data_files("adaptitune") + collect_data_files("librosa")
+# the check reports name each library's version, which importlib.metadata reads from its dist-info
+for dist in ("numpy", "scipy", "librosa", "onnxruntime", "pyworld", "praat-parselmouth", "PySide6"):
+    datas += copy_metadata(dist)
 # the trackers exported by scripts/export_onnx.py: FCPE (the O2 choice, what the app uses) and
 # PESTO (its fallback); without them the app falls back to pYIN, which is too slow for NFR2.
 # PyInstaller 6 puts them in _internal/models (find_onnx_model looks there).
@@ -33,7 +36,7 @@ except Exception:
     commit = None
 os.makedirs("build", exist_ok=True)
 with open("build/build_info.json", "w") as f:
-    json.dump({"git_commit": os.environ.get("GITHUB_SHA") or commit or None, "built": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+    json.dump({"git_commit": commit or os.environ.get("GITHUB_SHA") or None, "built": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
                "packaged": True}, f)
 datas.append(("../build/build_info.json", "adaptitune"))
 

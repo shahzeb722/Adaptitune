@@ -1,0 +1,50 @@
+{
+  "tracker": "fcpe-onnx",
+  "audio_seconds": 20.77,
+  "rtf": 0.157,
+  "rtf_median": 0.157,
+  "stages_rtf": {
+    "analysis": 0.119,
+    "plan": 0.001,
+    "shift": 0.049
+  },
+  "route_shares": {
+    "world": 0.494,
+    "psola": 0.506,
+    "untouched": 0.0
+  },
+  "cpu": "AMD EPYC 9V74 80-Core Processor",
+  "cores": 4,
+  "threads": 4,
+  "repeats": 3,
+  "target": 0.5,
+  "pass": true,
+  "machine": {
+    "cpu": "AMD EPYC 9V74 80-Core Processor",
+    "logical_cores": 4,
+    "threads": 4,
+    "platform": "Windows-10-10.0.26100-SP0",
+    "python": "3.11.9",
+    "git_commit": "93e6d3719dcc179beaf4dba618ed0284ddda22b0",
+    "packaged_app": true,
+    "time": "2026-11-04T08:28:16+0000",
+    "physical_cores": 2,
+    "ram_gb": 16.0,
+    "versions": {
+      "numpy": "2.4.6",
+      "scipy": null,
+      "librosa": null,
+      "onnxruntime": null,
+      "pyworld": "0.3.5",
+      "praat-parselmouth": null
+    }
+  },
+  "input": "20 s of synthetic singing",
+  "platform": "Windows-10-10.0.26100-SP0",
+  "packaged_app": true,
+  "build": {
+    "git_commit": "93e6d3719dcc179beaf4dba618ed0284ddda22b0",
+    "built": "2026-11-04T08:25:48+0000",
+    "packaged": true
+  }
+}
