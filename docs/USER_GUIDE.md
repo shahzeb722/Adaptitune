@@ -57,7 +57,7 @@ The study keeps its own files, apart from your own profile, in `C:\Users\<you>\.
 
 These checks are how O5 is measured on the reference laptop. Each one shows PASS or FAIL and keeps its report in the `checks` folder next to your profile; **Save report…** puts a copy wherever you like, for example to send it to the team.
 
-1. **Check this installation** (Help menu). It runs every feature (FR1–FR7) on a short built-in take with all network access blocked, in a separate throwaway profile, so your own profile is not touched. It takes about a minute.
+1. **Check this installation** (Help menu). It runs every feature (FR1–FR7) on a short built-in take with all network access blocked, in a separate throwaway profile, so your own profile is not touched, and checks that the light and dark looks load. It takes about a minute.
 2. **Speed test** (Help menu, NFR2). Close other programs, plug in the charger and set Windows to its best-performance power mode, because a laptop on battery runs slower. Click **MIR-1K folder…** and choose the folder that holds MIR-1K, such as `E:\FYP\MIR1K`. The test times the whole correction path three times on the first minute of MIR-1K vocals, the same audio as the cloud run, and reports the best. It takes one to three minutes. The target is a real-time factor of 0.5 or less.
 3. **Offline check** (NFR1). Turn Wi-Fi off and unplug any network cable. Open the app, then import a take, correct it, keep or rate it, make an A/B pair, apply and save a manual setting, and export your profile. Everything should work. Run **Check this installation** once more while you are offline.
 

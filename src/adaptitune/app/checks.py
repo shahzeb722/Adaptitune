@@ -2,7 +2,8 @@
 
 * ``self_test`` drives every feature (FR1-FR7) through the main window, the way the buttons do,
   on a short detuned synthetic take, with the network blocked (NFR1) and a throwaway profile
-  folder, and reports each requirement. The Windows build runs it in CI on the packaged app.
+  folder, and reports each requirement. It also loads the light and dark looks and paints the
+  window with each. The Windows build runs it in CI on the packaged app.
 * ``speed_test`` times the whole correction path the way the app runs it (NFR2): the tracker,
   the key, the planner and WORLD/PSOLA with the quality check. Given the MIR-1K folder it times
   the same minute of vocals as the cloud run (docs/RESULTS.md, O5); given a file, that file.
@@ -178,6 +179,24 @@ def self_test(tracker: str = "auto", timeout: float = 600.0) -> dict:
             exported = out.exists() and "posterior" in out.read_text()
             w.session.reset()
             check("FR7 reset or export the profile", exported and w.session.interactions == 0, f"exported {out.stat().st_size} bytes; reset to 0 judgments")
+
+            # the look: the stylesheet loads in both appearances and the window paints with it
+            from PySide6.QtCore import qInstallMessageHandler
+
+            from . import theme
+
+            qt_messages = []
+            previous = qInstallMessageHandler(lambda mode, context, message: qt_messages.append(message))
+            try:
+                for mode in ("dark", "light"):
+                    theme.apply(app, mode)
+                    w.grab()
+                    app.processEvents()
+            finally:
+                qInstallMessageHandler(previous)
+            bad = [m for m in qt_messages if "style" in m.lower() or "parse" in m.lower()]
+            check("Look in light and dark", not bad and not theme.app_icon().isNull(),
+                  "stylesheet and icon load, window painted in both" if not bad else "; ".join(bad[:3]))
 
             check("NFR1 no network", not net.attempts, "no connection attempted" if not net.attempts else f"attempts: {net.attempts[:5]}")
         files = sorted(str(p.relative_to(home)) for p in home.rglob("*") if p.is_file())

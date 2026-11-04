@@ -52,6 +52,17 @@ jobs:
           $p = Start-Process -FilePath dist\AdaptiTune\AdaptiTune.exe -ArgumentList '--speed-test', '--out', 'speed_test.json' -Wait -PassThru
           Get-Content speed_test.json
           if (-not (Get-Content -Raw speed_test.json | ConvertFrom-Json).rtf) { exit 1 }
+      # The checks above run without a window; this opens the real one the way a double-click
+      # does (crash log, look, saved settings, main window), then closes it after half a second.
+      - name: Open and close the packaged app's window
+        shell: pwsh
+        timeout-minutes: 5
+        run: |
+          $env:ADAPTITUNE_HOME = "$PWD\smoke_home"
+          $p = Start-Process -FilePath dist\AdaptiTune\AdaptiTune.exe -ArgumentList '--smoke-test' -Wait -PassThru
+          Get-Content smoke_home\logs\adaptitune.log
+          if ($p.ExitCode -ne 0) { exit 1 }
+          if (-not (Select-String -Quiet -Path smoke_home\logs\adaptitune.log -Pattern 'started AdaptiTune')) { exit 1 }
       - uses: actions/upload-artifact@v4
         with:
           name: AdaptiTune-windows
