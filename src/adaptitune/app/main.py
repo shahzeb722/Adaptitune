@@ -2,13 +2,18 @@
 
 Runs fully offline: nothing in the app or the pipeline opens a network connection, and the
 profile lives in a local SQLite file (``~/.adaptitune/profile.sqlite``, override with the
-``ADAPTITUNE_HOME`` environment variable).
+``ADAPTITUNE_HOME`` environment variable). Help has a speed test and a self-test
+(``adaptitune.app.checks``).
 
-    adaptitune-app            # or: python -m adaptitune.app.main
+    adaptitune-app            # or: python -m adaptitune.app.launch
 """
 
 from __future__ import annotations
 
+import json
+import os
+import shutil
+import subprocess
 import sys
 import tempfile
 import time
@@ -16,7 +21,18 @@ import traceback
 from pathlib import Path
 
 import numpy as np
-from PySide6.QtCore import QObject, QRunnable, Qt, QThreadPool, QTimer, QUrl, Signal, Slot
+from PySide6.QtCore import (
+    QObject,
+    QRunnable,
+    QStandardPaths,
+    Qt,
+    QThreadPool,
+    QTimer,
+    QUrl,
+    Signal,
+    Slot,
+)
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -95,6 +111,10 @@ class Player:
     def stop(self):
         self.player.stop()
 
+    def close(self):
+        self.stop()
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
 
 class Recorder:
     """Microphone capture through sounddevice (PortAudio). Optional: import still works
@@ -122,8 +142,10 @@ class Recorder:
         self.stream.start()
 
     def stop(self) -> Audio:
-        self.stream.stop()
-        self.stream.close()
+        if self.stream is not None:
+            self.stream.stop()
+            self.stream.close()
+            self.stream = None
         x = np.concatenate(self.chunks)[:, 0] if self.chunks else np.zeros(1)
         return preprocess(x, self.sr)
 
@@ -132,11 +154,14 @@ class Recorder:
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, session_factory=None):
+    def __init__(self, session_factory=None, show_errors: bool = True):
         super().__init__()
         self.setWindowTitle(APP_NAME)
         self.resize(1000, 720)
         self.pool = QThreadPool.globalInstance()
+        self._jobs = set()  # running jobs; PySide drops a job's result if nothing holds the job
+        self.errors = []  # tracebacks of failed jobs (the self-test reads them)
+        self.show_errors = show_errors
         self._session_factory = session_factory or self._default_session
         self.session = None
         self.take = None
@@ -233,6 +258,15 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(root)
         self.status = self.statusBar()
         self._set_enabled(False)
+        self._build_menu()
+
+    def _build_menu(self):
+        m = self.menuBar().addMenu("&Help")
+        m.addAction("Speed test…").triggered.connect(self._speed_test)
+        m.addAction("Check this installation").triggered.connect(self._self_test)
+        m.addSeparator()
+        m.addAction("Where my data is stored").triggered.connect(self._data_folder)
+        m.addAction(f"About {APP_NAME}").triggered.connect(self._about)
 
     def _auto_tab(self):
         w = QWidget()
@@ -334,11 +368,23 @@ class MainWindow(QMainWindow):
         self.status.showMessage(f"Singer: {self.session.user if self.session else '-'} · learned from {n} judgments" + (f" · {extra}" if extra else ""))
 
     def _run(self, fn, done, msg, *a, **kw):
+        """Run ``fn`` on a worker thread, then ``done(result)`` back on the UI thread."""
         self._busy(msg)
         job = Job(fn, *a, **kw)
-        job.signals.done.connect(lambda r: (self._idle(), done(r)))
-        job.signals.failed.connect(lambda e: (self._idle(), QMessageBox.critical(self, APP_NAME, e)))
+        self._jobs.add(job)  # without this reference PySide discards the finished signal
+
+        def finished():
+            self._jobs.discard(job)
+            self._idle()
+
+        job.signals.done.connect(lambda r: (finished(), done(r)))
+        job.signals.failed.connect(lambda e: (finished(), self._error(e)))
         self.pool.start(job)
+
+    def _error(self, text):
+        self.errors.append(text)
+        if self.show_errors:
+            QMessageBox.critical(self, APP_NAME, text)
 
     def _play(self, audio):
         if audio is not None and self.player:
@@ -400,17 +446,30 @@ class MainWindow(QMainWindow):
 
     # ------------------------------------------------------------------ input (FR1, FR2)
     def _import(self):
-        path, _ = QFileDialog.getOpenFileName(self, "Import vocal", "", "Audio (*.wav *.flac *.ogg *.mp3 *.m4a);;All files (*)")
+        path, _ = QFileDialog.getOpenFileName(self, "Import vocal", "", "Audio (*.wav *.flac *.ogg *.mp3 *.aiff);;All files (*)")
         if path:
             self._load(path)
 
     def _record(self, on):
         if on:
+            try:
+                self.recorder.start()
+            except Exception as e:  # no microphone, or Windows does not let desktop apps use it
+                self.btn_record.blockSignals(True)
+                self.btn_record.setChecked(False)
+                self.btn_record.blockSignals(False)
+                self._error(f"Recording could not start: {e}\n\nCheck that a microphone is connected and that "
+                            "Windows lets desktop apps use it (Settings > Privacy & security > Microphone). "
+                            "Importing a file still works.")
+                return
             self.btn_record.setText("■ Stop recording")
-            self.recorder.start()
         else:
             self.btn_record.setText("● Record")
-            self._load(self.recorder.stop())
+            audio = self.recorder.stop()
+            if audio.duration < 0.5:
+                self._error("The recording is shorter than half a second, so there is nothing to correct.")
+                return
+            self._load(audio)
 
     def _load(self, src):
         key = None if self.key_box.currentIndex() == 0 else self.key_box.currentText()
@@ -509,6 +568,102 @@ class MainWindow(QMainWindow):
         self.session.save_manual(self.take, self._manual_settings(), seconds=secs, adjustments=self.manual_adjustments)
         self.manual_started, self.manual_adjustments = None, 0
         self._update_status("saved as your manual setting")
+
+    # ------------------------------------------------------------------ help: checks (O5)
+    def _speed_test(self):
+        box = QMessageBox(self)
+        box.setWindowTitle("Speed test")
+        box.setText("Times the whole correction path on this computer: pitch tracking, key, note planning and "
+                    "WORLD/PSOLA. The target is 0.5× real time or less on the reference laptop.\n\n"
+                    "For the report, choose the MIR-1K folder: the test then times the same minute of singing "
+                    "as the cloud run. It takes one to three minutes; close other programs first.")
+        b_mir = box.addButton("MIR-1K folder…", QMessageBox.AcceptRole)
+        b_file = box.addButton("Audio file…", QMessageBox.ActionRole)
+        box.addButton(QMessageBox.Cancel)
+        box.exec()
+        if box.clickedButton() is b_mir:
+            src = QFileDialog.getExistingDirectory(self, "Folder that contains MIR-1K")
+        elif box.clickedButton() is b_file:
+            src, _ = QFileDialog.getOpenFileName(self, "Audio file to time", "", "Audio (*.wav *.flac *.ogg *.mp3 *.aiff)")
+        else:
+            return
+        if src:
+            self._run_check(["--speed-test", src], "speed", "Speed test running (1–3 minutes)…")
+
+    def _self_test(self):
+        self._run_check(["--self-test"], "self", "Checking every feature with the network blocked…")
+
+    def _run_check(self, args, kind, msg):
+        """Run a check in a separate process of this app, so its thread settings and throwaway
+        profile cannot touch this window's session."""
+        out = Path(tempfile.mkdtemp(prefix="adaptitune_check_")) / f"{kind}_test.json"
+        cmd = check_command(args + ["--out", str(out)])
+
+        def work():
+            env = dict(os.environ)
+            env.pop("QT_QPA_PLATFORM", None)  # the check sets its own (offscreen)
+            p = subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=3600,
+                               creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+            if not out.exists():
+                raise RuntimeError(f"the check did not finish (exit code {p.returncode})\n{p.stderr[-2000:]}")
+            return json.loads(out.read_text())
+
+        self._run(work, lambda r: self._check_done(r, kind), msg)
+
+    def _check_done(self, report, kind):
+        from .checks import summary
+
+        keep = Path(self.session.store.path).parent / "checks" / f"{kind}_test_{time.strftime('%Y%m%d_%H%M%S')}.json"
+        keep.parent.mkdir(parents=True, exist_ok=True)
+        keep.write_text(json.dumps(report, indent=2, default=str))
+        box = QMessageBox(self)
+        box.setWindowTitle("Speed test" if kind == "speed" else "Installation check")
+        box.setText(report.get("error") or summary(report, kind))
+        save = box.addButton("Save report…", QMessageBox.AcceptRole)
+        box.addButton(QMessageBox.Close)
+        box.exec()
+        if box.clickedButton() is save:
+            docs = QStandardPaths.writableLocation(QStandardPaths.DocumentsLocation)
+            path, _ = QFileDialog.getSaveFileName(self, "Save report", str(Path(docs) / keep.name), "JSON (*.json)")
+            if path:
+                shutil.copyfile(keep, path)
+        self._update_status(f"{'speed test' if kind == 'speed' else 'check'} report kept in {keep.parent}")
+
+    def _data_folder(self):
+        folder = Path(self.session.store.path).parent
+        box = QMessageBox(self)
+        box.setWindowTitle("Your data")
+        box.setText(f"Your profile and everything AdaptiTune learned about each singer are in\n{folder}\n\n"
+                    "Nothing is sent anywhere: the app works with no internet connection. Recordings are "
+                    "saved only where you save them.")
+        opened = box.addButton("Open folder", QMessageBox.AcceptRole)
+        box.addButton(QMessageBox.Close)
+        box.exec()
+        if box.clickedButton() is opened:
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder)))
+
+    def _about(self):
+        from ..machine import build_info
+
+        b = build_info()
+        commit = (b.get("git_commit") or "unknown")[:7]
+        tracker = self.session.corrector.tracker.name if self.session else "?"
+        QMessageBox.about(self, f"About {APP_NAME}",
+                          f"{APP_NAME} {__import__('adaptitune').__version__} (build {commit})\n"
+                          f"Pitch tracker: {tracker}\n\nOffline vocal pitch correction that learns each singer's "
+                          "preferred settings. COMSATS University Islamabad, Lahore Campus, final year project.")
+
+    def closeEvent(self, e):
+        if self.player:
+            self.player.close()
+        super().closeEvent(e)
+
+
+def check_command(args: list[str]) -> list[str]:
+    """How to start this app with the given arguments: the packaged executable, or Python."""
+    if getattr(sys, "frozen", False):
+        return [sys.executable, *args]
+    return [sys.executable, "-m", "adaptitune.app.launch", *args]
 
 
 def main(argv=None):

@@ -23,7 +23,7 @@ AdaptiTune corrects a recorded vocal the way classic auto-tune does: it detects 
 ```bash
 python3.11 -m venv .venv && source .venv/bin/activate      # Windows: .venv\Scripts\activate
 pip install -e ".[app,dev,study]"
-pytest                                                     # about 120 tests, 2-4 minutes
+pytest                                                     # about 130 tests, 5-10 minutes
 adaptitune-app                                             # the desktop app
 adaptitune correct my_take.wav fixed.wav --key "A minor"   # one file from the command line
 ```
@@ -87,8 +87,9 @@ adaptitune eval-corrector data/corpus --tracker fcpe --measure-tracker pyin # O3
 * The pitch view and the table show how far each note was off before and after (FR6).
 * The profile can be reset or exported (FR7). It lives in `~/.adaptitune/profile.sqlite`; set `ADAPTITUNE_HOME` to move it.
 * Recording needs `sounddevice` and a microphone, while importing works without them.
+* **Help → Check this installation** runs every feature through the window with the network blocked, in a throwaway profile. **Help → Speed test** times the whole correction path on the MIR-1K folder (O5). Both keep a JSON report, and both run from the command line: `AdaptiTune.exe --self-test`, `AdaptiTune.exe --speed-test E:\FYP\MIR1K` (in a checkout, `python -m adaptitune.app.launch` in place of the exe).
 
-To build the Windows app, run `packaging\build_windows.bat` (PyInstaller, one-folder build).
+The Windows app is built on every push by `.github/workflows/windows-app.yml`, which also runs both checks on the packaged exe. Download it from the run's **AdaptiTune-windows** artifact, or build it with `packaging\build_windows.bat` (PyInstaller, one-folder build). [docs/USER_GUIDE.md](docs/USER_GUIDE.md) covers installing it, each feature, and the laptop checks.
 
 ## License
 

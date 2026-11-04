@@ -39,20 +39,11 @@ def run(cmd, env=None):
 
 
 def join_vocals(mir1k_root: str, path: Path, seconds: float = 60.0) -> None:
-    """The vocal channel of the first MIR-1K clips, with 0.3 s gaps, until ``seconds`` long."""
-    import numpy as np
+    """The vocal channel of the first MIR-1K clips, with 0.3 s gaps, until ``seconds`` long
+    (the same audio the app's own speed test times)."""
+    from adaptitune.bench.rtf import mir1k_minute
 
-    from adaptitune.audio import Audio, save
-    from adaptitune.data.datasets import mir1k
-
-    parts, total, sr = [], 0.0, 16_000
-    for item in mir1k(mir1k_root, sr=sr):
-        parts += [item.audio.samples, np.zeros(int(0.3 * sr))]
-        total += item.audio.duration + 0.3
-        if total >= seconds:
-            break
-    path.parent.mkdir(parents=True, exist_ok=True)
-    save(path, Audio(np.concatenate(parts), sr), "PCM_16")
+    mir1k_minute(mir1k_root, path, seconds)
 
 
 def main():
@@ -88,7 +79,7 @@ def main():
             run(exe + ["bench-trackers", "--dataset", ds, "--root", root, "--shard", shard, "--threads", str(a.threads), "--out", str(out)] + extra)
 
     # O5: the full correction path on real singing, pinned to the same number of threads
-    from adaptitune.bench.trackers import thread_env
+    from adaptitune.machine import thread_env
 
     vocals = out / "pipeline_input.wav"
     join_vocals(a.mir1k, vocals)

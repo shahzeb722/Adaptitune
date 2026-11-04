@@ -1,0 +1,62 @@
+name: windows-app
+# Builds the offline Windows app (NFR4) and checks the packaged build itself: every feature with
+# the network blocked (FR1-FR7, NFR1) and a speed test. The official speed number (NFR2) comes
+# from the reference laptop: Help > Speed test in this build, on the MIR-1K folder.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      # One pip call, so the setuptools<81 pin holds (pyworld imports pkg_resources). PyInstaller
+      # 6.11 cannot package NumPy 2.4; backports.tarfile is what setuptools' vendored jaraco needs.
+      - name: Install the app and the packager
+        run: python -m pip install -e ".[app]" "pyinstaller==6.22.3" "backports.tarfile>=1.2"
+      - name: Export FCPE, the tracker O2 chose, to ONNX (the script checks it against PyTorch)
+        run: |
+          python -m pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install "torchfcpe>=0.0.4" "onnx>=1.15" "setuptools<81"
+          python scripts/export_onnx.py --model fcpe
+      - name: Build
+        run: pyinstaller packaging/adaptitune.spec --noconfirm --distpath dist --workpath build
+      - name: Remove PyTorch, so nothing outside the build can help it
+        run: python -m pip uninstall -y torch torchaudio torchfcpe
+      # The exe is windowed, so it is started with Start-Process and waited for; each check writes
+      # its report as JSON whatever happens, and a step limit stops a stuck dialog holding the job.
+      - name: Self-test the packaged app (FR1-FR7, network blocked)
+        shell: pwsh
+        timeout-minutes: 15
+        run: |
+          $p = Start-Process -FilePath dist\AdaptiTune\AdaptiTune.exe -ArgumentList '--self-test', '--out', 'self_test.json' -Wait -PassThru
+          Get-Content self_test.json
+          if ($p.ExitCode -ne 0) { exit 1 }
+      - name: Speed test of the packaged app (synthetic singing, on the CI machine)
+        shell: pwsh
+        timeout-minutes: 15
+        run: |
+          $p = Start-Process -FilePath dist\AdaptiTune\AdaptiTune.exe -ArgumentList '--speed-test', '--out', 'speed_test.json' -Wait -PassThru
+          Get-Content speed_test.json
+          if (-not (Get-Content -Raw speed_test.json | ConvertFrom-Json).rtf) { exit 1 }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AdaptiTune-windows
+          path: dist/AdaptiTune
+          retention-days: 30
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-checks
+          path: |
+            self_test.json
+            speed_test.json

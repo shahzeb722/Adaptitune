@@ -39,6 +39,8 @@ import numpy as np
 import pandas as pd
 
 from .. import metrics as M
+from ..machine import cpu_name, git_commit, thread_env, version  # noqa: F401 (thread_env is used by callers)
+from ..machine import machine_info as _machine_info
 
 TORCH_TRACKERS = {"pesto", "fcpe", "crepe"}
 DATASETS = ("mir1k", "mdb", "synthetic")
@@ -73,77 +75,20 @@ TRAINED_ON: dict[str, tuple[str, ...]] = {
 
 
 def _cpu_name() -> str:
-    import platform
-
-    try:
-        if sys.platform.startswith("linux"):
-            with open("/proc/cpuinfo") as f:
-                for line in f:
-                    if line.startswith("model name"):
-                        return line.split(":", 1)[1].strip()
-        elif sys.platform == "darwin":
-            return subprocess.run(["sysctl", "-n", "machdep.cpu.brand_string"], capture_output=True, text=True).stdout.strip()
-        elif sys.platform == "win32":
-            import winreg
-
-            k = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"HARDWARE\DESCRIPTION\System\CentralProcessor\0")
-            return str(winreg.QueryValueEx(k, "ProcessorNameString")[0]).strip()
-    except Exception:
-        pass
-    return platform.processor() or platform.machine()
+    return cpu_name()
 
 
 def _version(pkg: str) -> str | None:
-    from importlib import metadata
-
-    try:
-        return metadata.version(pkg)
-    except Exception:
-        return None
+    return version(pkg)
 
 
 def _git_commit() -> str | None:
-    try:
-        here = Path(__file__).resolve().parent
-        out = subprocess.run(["git", "rev-parse", "HEAD"], cwd=here, capture_output=True, text=True, timeout=5)
-        return out.stdout.strip() or None
-    except Exception:
-        return None
+    return git_commit()
 
 
 def machine_info(threads: int) -> dict:
     """Everything needed to say which machine and software produced a speed number."""
-    import platform
-
-    info = {
-        "cpu": _cpu_name(),
-        "logical_cores": os.cpu_count(),
-        "threads": threads,
-        "platform": platform.platform(),
-        "python": platform.python_version(),
-        "git_commit": _git_commit(),
-        "time": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
-    }
-    try:
-        import psutil
-
-        info["physical_cores"] = psutil.cpu_count(logical=False)
-        info["ram_gb"] = round(psutil.virtual_memory().total / 2**30, 1)
-    except Exception:
-        pass
-    info["versions"] = {
-        p: _version(p)
-        for p in ("numpy", "scipy", "librosa", "mir_eval", "torch", "onnxruntime", "pesto-pitch", "torchfcpe", "torchcrepe")
-    }
-    return info
-
-
-def thread_env(threads: int) -> dict:
-    """Environment that pins every numeric library to ``threads`` threads."""
-    env = dict(os.environ)
-    for var in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS", "NUMBA_NUM_THREADS", "VECLIB_MAXIMUM_THREADS", "ADAPTITUNE_THREADS"):
-        env[var] = str(threads)
-    return env
+    return _machine_info(threads, ("numpy", "scipy", "librosa", "mir_eval", "torch", "onnxruntime", "pesto-pitch", "torchfcpe", "torchcrepe"))
 
 
 def _rss_mb() -> float:

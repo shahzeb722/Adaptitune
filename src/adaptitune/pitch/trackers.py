@@ -442,7 +442,10 @@ def find_onnx_model(model: str = "pesto") -> str | None:
     home = Path(os.environ.get("ADAPTITUNE_HOME", Path.home() / ".adaptitune"))
     cands += [str(home / f"{model}.onnx"), f"models/{model}.onnx"]
     if getattr(sys, "frozen", False):
-        cands.append(str(Path(sys.executable).parent / "models" / f"{model}.onnx"))
+        # PyInstaller 6 puts bundled data in _internal/ (sys._MEIPASS), not next to the exe
+        for base in (getattr(sys, "_MEIPASS", None), Path(sys.executable).parent):
+            if base:
+                cands.append(str(Path(base) / "models" / f"{model}.onnx"))
     for c in cands:
         if c and Path(c).is_file():
             return c
